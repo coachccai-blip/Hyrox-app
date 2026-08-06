@@ -147,15 +147,25 @@ function saveState(state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
-/** Met à jour les records all-time à partir de valeurs de semaine. */
-function updateAllTime(state, weekKey, values) {
+/**
+ * Recalcule les records all-time : pour chaque catégorie, on cherche le plus
+ * haut volume atteint sur TOUTES les semaines connues — la semaine en cours
+ * comme les semaines passées. Ainsi les records restent justes même après un
+ * écrasement de données (une valeur plus basse ne "gèle" pas un ancien record).
+ */
+function recomputeAllTime(state) {
+  const allTime = {};
   EXERCISES.forEach((ex) => {
-    const val = values[ex.id] || 0;
-    const rec = state.allTime[ex.id];
-    if (!rec || val > rec.value) {
-      state.allTime[ex.id] = { value: val, week: weekKey };
-    }
+    let best = { value: 0, week: null };
+    state.history.forEach((h) => {
+      const v = (h.values && h.values[ex.id]) || 0;
+      if (v > best.value) best = { value: v, week: h.week };
+    });
+    const cv = state.current[ex.id] || 0;
+    if (cv > best.value) best = { value: cv, week: state.currentWeek };
+    allTime[ex.id] = best;
   });
+  state.allTime = allTime;
 }
 
 /** Archive la semaine courante dans l'historique si elle contient du volume. */
@@ -174,7 +184,7 @@ function archiveCurrent(state) {
   } else {
     state.history.unshift(entry);
   }
-  updateAllTime(state, state.currentWeek, state.current);
+  recomputeAllTime(state);
 }
 
 /** Vérifie le changement de semaine et réinitialise si nécessaire. */
@@ -198,20 +208,32 @@ function ensureCurrentWeek(state) {
    ------------------------------------------------------------------------- */
 let STATE = loadState();
 
-function addVolume(exId, amount) {
-  const ex = EXERCISES.find((e) => e.id === exId);
-  const before = levelIndexFor(STATE.current[exId] || 0, ex.tiers);
-  let next = (STATE.current[exId] || 0) + amount;
-  if (next < 0) next = 0;
-  STATE.current[exId] = ex.decimals ? Math.round(next * 10) / 10 : Math.round(next);
-  // Met à jour les records en temps réel aussi
-  updateAllTime(STATE, STATE.currentWeek, STATE.current);
-  const after = levelIndexFor(STATE.current[exId], ex.tiers);
+/** Applique une nouvelle valeur (déjà calculée) et rafraîchit tout. */
+function commitValue(ex, before, newValue) {
+  let v = newValue;
+  if (isNaN(v) || v < 0) v = 0;
+  STATE.current[ex.id] = ex.decimals ? Math.round(v * 10) / 10 : Math.round(v);
+  recomputeAllTime(STATE); // records = plus haut volume, semaine en cours incluse
+  const after = levelIndexFor(STATE.current[ex.id], ex.tiers);
   saveState(STATE);
   renderAll();
   if (after > before) {
     toast(`${ex.emoji} Nouveau titre débloqué : ${titleFor(ex, after)} !`);
   }
+}
+
+/** Ajoute (ou retire) du volume à la semaine en cours. */
+function addVolume(exId, amount) {
+  const ex = EXERCISES.find((e) => e.id === exId);
+  const before = levelIndexFor(STATE.current[exId] || 0, ex.tiers);
+  commitValue(ex, before, (STATE.current[exId] || 0) + amount);
+}
+
+/** Écrase le total de la semaine en cours par une valeur absolue. */
+function setVolume(exId, value) {
+  const ex = EXERCISES.find((e) => e.id === exId);
+  const before = levelIndexFor(STATE.current[exId] || 0, ex.tiers);
+  commitValue(ex, before, value);
 }
 
 /* ---- Saisie ---- */
@@ -238,8 +260,11 @@ function renderInputs() {
       </div>
       <div class="quick-adds"></div>
       <div class="custom-add">
-        <input type="number" inputmode="decimal" min="0" step="${ex.decimals ? '0.1' : '1'}" placeholder="Ajouter (${ex.unit})" />
-        <button type="button">＋</button>
+        <input type="number" inputmode="decimal" min="0" step="${ex.decimals ? '0.1' : '1'}" placeholder="Valeur (${ex.unit})" />
+      </div>
+      <div class="custom-actions">
+        <button type="button" class="btn-add">Ajouter à la semaine en cours</button>
+        <button type="button" class="btn-set">Écraser les données de la semaine</button>
       </div>
     `;
 
@@ -260,14 +285,28 @@ function renderInputs() {
     quick.appendChild(minus);
 
     const input = card.querySelector('input');
-    const addBtn = card.querySelector('.custom-add button');
-    const commit = () => {
+    const addBtn = card.querySelector('.btn-add');
+    const setBtn = card.querySelector('.btn-set');
+
+    const doAdd = () => {
       const v = parseFloat(input.value);
       if (!isNaN(v) && v !== 0) addVolume(ex.id, v);
       input.value = '';
     };
-    addBtn.addEventListener('click', commit);
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') commit(); });
+    const doSet = () => {
+      const v = parseFloat(input.value);
+      if (isNaN(v)) { input.value = ''; return; }
+      const cur = STATE.current[ex.id] || 0;
+      const curTxt = ex.id === 'gainage' ? fmtSeconds(cur) : `${fmt(ex, cur)} ${ex.unit}`;
+      const newTxt = ex.id === 'gainage' ? fmtSeconds(v) : `${fmt(ex, v)} ${ex.unit}`;
+      if (cur > 0 && !confirm(`Écraser ${ex.name} : remplacer ${curTxt} par ${newTxt} pour la semaine en cours ?`)) return;
+      setVolume(ex.id, v);
+      input.value = '';
+    };
+
+    addBtn.addEventListener('click', doAdd);
+    setBtn.addEventListener('click', doSet);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doAdd(); });
 
     grid.appendChild(card);
   });
@@ -641,16 +680,6 @@ function toast(msg) {
 /* -------------------------------------------------------------------------
    7. Actions du pied de page
    ------------------------------------------------------------------------- */
-document.getElementById('closeWeekBtn').addEventListener('click', () => {
-  if (!confirm('Clôturer la semaine en cours ? Ton volume actuel sera archivé dans l\'historique et remis à zéro.')) return;
-  archiveCurrent(STATE);
-  STATE.current = emptyValues();
-  // On garde la même clé de semaine (nouvelle saisie repart de zéro pour la semaine courante)
-  saveState(STATE);
-  renderAll();
-  toast('✅ Semaine clôturée et archivée');
-});
-
 document.getElementById('resetAllBtn').addEventListener('click', () => {
   if (!confirm('Effacer TOUTES les données (semaine, historique, records) ? Action irréversible.')) return;
   localStorage.removeItem(STORAGE_KEY);
@@ -665,6 +694,8 @@ document.getElementById('resetAllBtn').addEventListener('click', () => {
    ------------------------------------------------------------------------- */
 (function init() {
   const didReset = ensureCurrentWeek(STATE);
+  recomputeAllTime(STATE); // records à jour dès le chargement (semaine en cours + passées)
+  saveState(STATE);
   renderAll();
   if (didReset) {
     toast('🔄 Nouvelle semaine : compteurs remis à zéro !');

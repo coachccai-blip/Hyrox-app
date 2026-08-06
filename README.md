@@ -7,9 +7,13 @@ des semaines passées et met en avant tes **records all-time**.
 ## ✨ Fonctionnalités
 
 - **Saisie hebdomadaire** de ton volume pour 5 catégories : Burpees, Wallballs, Fentes chargées, Course, Gainage.
+  Pour chaque exercice, deux boutons distincts :
+  - **Ajouter à la semaine en cours** — cumule la valeur saisie au total de la semaine.
+  - **Écraser les données de la semaine** — remplace le total de la semaine par la valeur saisie.
 - **Réinitialisation automatique chaque lundi** (semaine ISO). Le volume de la semaine écoulée est archivé.
 - **Historique consultable** de chaque semaine passée, avec le titre atteint dans chaque catégorie.
-- **Records all-time** par catégorie (avec la semaine du record).
+- **Records all-time** par catégorie : recalculés comme le **plus haut volume atteint** sur toutes les
+  semaines connues (semaine en cours **ou** semaines passées), donc toujours justes même après un écrasement.
 - **Titres gamifiés** débloqués (et re-débloqués chaque semaine) selon le volume réalisé :
   - 🐱 Burpees → *Chaton* (endormi → paresseux → motivé → de compétition → survolté → de guerre → d'élite)
   - 🦍 Wallballs → *Gorille*

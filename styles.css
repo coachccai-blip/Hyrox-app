@@ -155,16 +155,30 @@ em { color: var(--text); font-style: normal; font-weight: 600; }
   min-width: 0;
 }
 .custom-add input:focus { outline: none; border-color: var(--accent); }
-.custom-add button {
-  border: none;
+
+.custom-actions { display: flex; flex-direction: column; gap: 8px; }
+.custom-actions button {
+  border: 1px solid transparent;
   border-radius: 10px;
-  padding: 0 14px;
+  padding: 10px 12px;
   font-weight: 700;
+  font-size: 13px;
   cursor: pointer;
+  line-height: 1.2;
+  transition: transform 0.05s ease, filter 0.15s ease, background 0.15s ease;
+}
+.custom-actions button:active { transform: scale(0.98); }
+.custom-actions .btn-add {
   color: #fff;
   background: linear-gradient(180deg, var(--accent), #6743e6);
 }
-.custom-add button:active { transform: scale(0.97); }
+.custom-actions .btn-add:hover { filter: brightness(1.08); }
+.custom-actions .btn-set {
+  color: var(--text);
+  background: var(--panel-2);
+  border-color: var(--line);
+}
+.custom-actions .btn-set:hover { border-color: var(--lvl-survolte); color: #ffd0d0; }
 
 /* ---------- Badges ---------- */
 .badges-row {
