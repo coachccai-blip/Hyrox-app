@@ -50,12 +50,17 @@ logo.png       # logo de l'app (en-tête + favicon) — à déposer ici
 netlify.toml   # config Netlify (site statique, publish = ".")
 ```
 
-## 🖼️ Logo
+## 🖼️ Logo & icône d'application
 
-L'en-tête et le favicon utilisent un fichier **`logo.png`** placé à la racine
-(à côté de `index.html`). Dépose simplement ton image sous ce nom exact.
-Format conseillé : carré (par ex. 512×512 px). Si `logo.png` est absent,
-l'app affiche automatiquement un emoji 🐱 de secours — rien n'est cassé.
+- **`logo.png`** (racine, à côté de `index.html`) : logo affiché dans l'en-tête.
+  Si le fichier est absent, l'app affiche un emoji 🐱 de secours — rien n'est cassé.
+- **`icon-192.png` et `icon-512.png`** : icônes utilisées comme **favicon** (onglet)
+  et comme **icône d'application au téléchargement/installation** (Ajouter à l'écran
+  d'accueil / PWA), déclarées dans `manifest.webmanifest`.
+
+Pour changer le logo/l'icône : remplace `logo.png` par ta nouvelle image (carrée,
+idéalement 512×512 px), puis régénère les deux icônes aux bonnes tailles
+(`icon-192.png`, `icon-512.png`) à partir de ce même visuel.
 
 ## 💾 Données
 
