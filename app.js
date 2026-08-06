@@ -395,7 +395,7 @@ function renderRadar() {
     const line = document.createElementNS(NS, 'line');
     line.setAttribute('x1', cx); line.setAttribute('y1', cy);
     line.setAttribute('x2', p[0]); line.setAttribute('y2', p[1]);
-    line.setAttribute('stroke', '#2b3650');
+    line.setAttribute('stroke', '#2a2e26');
     line.setAttribute('stroke-width', '1');
     svg.appendChild(line);
   }
@@ -409,8 +409,8 @@ function renderRadar() {
   });
   const area = document.createElementNS(NS, 'polygon');
   area.setAttribute('points', valPts.join(' '));
-  area.setAttribute('fill', 'rgba(124, 92, 255, 0.30)');
-  area.setAttribute('stroke', '#7c5cff');
+  area.setAttribute('fill', 'rgba(212, 251, 46, 0.22)');
+  area.setAttribute('stroke', '#d4fb2e');
   area.setAttribute('stroke-width', '2.5');
   area.setAttribute('stroke-linejoin', 'round');
   svg.appendChild(area);
@@ -422,7 +422,7 @@ function renderRadar() {
     const p = point(i, rr);
     const dot = document.createElementNS(NS, 'circle');
     dot.setAttribute('cx', p[0]); dot.setAttribute('cy', p[1]); dot.setAttribute('r', '3.5');
-    dot.setAttribute('fill', '#c9b8ff');
+    dot.setAttribute('fill', '#eaffa0');
     svg.appendChild(dot);
 
     const lp = point(i, R + 26);
@@ -431,7 +431,7 @@ function renderRadar() {
     g.setAttribute('y', lp[1]);
     g.setAttribute('text-anchor', Math.abs(lp[0] - cx) < 8 ? 'middle' : (lp[0] < cx ? 'end' : 'start'));
     g.setAttribute('dominant-baseline', 'middle');
-    g.setAttribute('fill', '#eef2fb');
+    g.setAttribute('fill', '#f2f4ec');
     g.setAttribute('font-size', '18');
     g.textContent = ex.emoji;
     svg.appendChild(g);
@@ -441,7 +441,7 @@ function renderRadar() {
     nm.setAttribute('y', lp[1] + 15);
     nm.setAttribute('text-anchor', Math.abs(lp[0] - cx) < 8 ? 'middle' : (lp[0] < cx ? 'end' : 'start'));
     nm.setAttribute('dominant-baseline', 'middle');
-    nm.setAttribute('fill', '#8b97b3');
+    nm.setAttribute('fill', '#969c88');
     nm.setAttribute('font-size', '9');
     nm.textContent = ex.name;
     svg.appendChild(nm);
@@ -635,17 +635,38 @@ function renderHistory() {
   });
 }
 
-/* ---- En-tête semaine ---- */
+/* ---- En-tête semaine (bandeau + compte à rebours en direct) ---- */
 function renderWeekHeader() {
   const now = new Date();
   const { monday, sunday } = weekBounds(now);
-  document.getElementById('weekRange').textContent =
-    `${fmtDate(monday)} → ${fmtDate(sunday)}`;
-  const daysLeft = Math.ceil((sunday - now) / 86400000);
-  const nextMonday = new Date(sunday);
-  nextMonday.setDate(sunday.getDate() + 1);
-  document.getElementById('weekReset').textContent =
-    daysLeft <= 0 ? 'Réinitialisation imminente' : `Réinitialisation dans ${daysLeft} j`;
+  document.getElementById('weekTag').textContent = 'W' + isoWeek(now).week;
+  document.getElementById('weekRange').textContent = `${fmtDate(monday)} → ${fmtDate(sunday)}`;
+  updateCountdown();
+}
+
+/** Prochain lundi 00:00 (heure locale). */
+function nextMondayMidnight(from) {
+  const d = new Date(from);
+  const day = (d.getDay() + 6) % 7; // 0 = lundi
+  const daysUntilNextMonday = (7 - day) % 7 || 7;
+  const nm = new Date(d);
+  nm.setDate(d.getDate() + daysUntilNextMonday);
+  nm.setHours(0, 0, 0, 0);
+  return nm;
+}
+
+/** Met à jour le compte à rebours "Xj HH:MM:SS" vers le prochain lundi. */
+function updateCountdown() {
+  const el = document.getElementById('countdown');
+  if (!el) return;
+  const now = new Date();
+  let diff = Math.max(0, nextMondayMidnight(now) - now);
+  const d = Math.floor(diff / 86400000); diff -= d * 86400000;
+  const h = Math.floor(diff / 3600000); diff -= h * 3600000;
+  const m = Math.floor(diff / 60000); diff -= m * 60000;
+  const s = Math.floor(diff / 1000);
+  const pad = (n) => String(n).padStart(2, '0');
+  el.textContent = `${d}j ${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 
 /* ---- Rendu global ---- */
@@ -678,19 +699,270 @@ function toast(msg) {
 }
 
 /* -------------------------------------------------------------------------
-   7. Actions du pied de page
+   8. Navigation par onglets (barre du bas)
    ------------------------------------------------------------------------- */
-document.getElementById('resetAllBtn').addEventListener('click', () => {
-  if (!confirm('Effacer TOUTES les données (semaine, historique, records) ? Action irréversible.')) return;
-  localStorage.removeItem(STORAGE_KEY);
-  STATE = loadState();
-  ensureCurrentWeek(STATE);
-  renderAll();
-  toast('🧹 Données effacées');
+function switchTab(name) {
+  document.querySelectorAll('.page').forEach((p) => {
+    p.classList.toggle('active', p.dataset.page === name);
+  });
+  document.querySelectorAll('.tab').forEach((t) => {
+    t.classList.toggle('active', t.dataset.tab === name);
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.querySelectorAll('.tab').forEach((t) => {
+  t.addEventListener('click', () => switchTab(t.dataset.tab));
+});
+
+/* Sélecteur segmenté de l'historique (Semaines / All-time) */
+document.querySelectorAll('#histSeg .seg-btn').forEach((b) => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#histSeg .seg-btn').forEach((x) => x.classList.toggle('active', x === b));
+    const alltime = b.dataset.view === 'alltime';
+    document.getElementById('histWeeksView').classList.toggle('hidden', alltime);
+    document.getElementById('histAllTimeView').classList.toggle('hidden', !alltime);
+  });
 });
 
 /* -------------------------------------------------------------------------
-   8. Démarrage
+   9. Story Journal (galerie de séances marquantes, sans prix)
+   ------------------------------------------------------------------------- */
+const STORY_KEY = 'hyrox-journal-stories-v1';
+let STORIES = loadStories();
+let editingStoryId = null;
+let draftPhotos = [];
+
+function loadStories() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(STORY_KEY));
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+function saveStories() {
+  try {
+    localStorage.setItem(STORY_KEY, JSON.stringify(STORIES));
+    return true;
+  } catch (e) {
+    return false; // quota dépassé
+  }
+}
+function storyId() {
+  // identifiant sans Date.now()/Math.random() : basé sur le max existant
+  const max = STORIES.reduce((m, s) => Math.max(m, s.id || 0), 0);
+  return max + 1;
+}
+function fmtStoryDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function renderStories() {
+  const grid = document.getElementById('storyGrid');
+  const empty = document.getElementById('storyEmpty');
+  grid.innerHTML = '';
+  empty.classList.toggle('hidden', STORIES.length > 0);
+
+  STORIES.forEach((s) => {
+    const card = document.createElement('div');
+    card.className = 'story-card';
+    const cover = (s.photos && s.photos[0]) || null;
+    const count = s.photos ? s.photos.length : 0;
+    card.innerHTML = `
+      <div class="story-cover">
+        ${cover ? `<img src="${cover}" alt="" />` : '<div class="no-photo">✦</div>'}
+        ${count > 1 ? `<span class="story-count">${count} photos</span>` : ''}
+      </div>
+      <div class="story-body">
+        <p class="story-title">${escapeHtml(s.title || 'Sans titre')}</p>
+        ${s.desc ? `<p class="story-desc">${escapeHtml(s.desc)}</p>` : ''}
+        <div class="story-date">${fmtStoryDate(s.created)}</div>
+      </div>
+    `;
+    card.addEventListener('click', () => openStoryEditor(s.id));
+    grid.appendChild(card);
+  });
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+/* ---- Éditeur ---- */
+function openStoryEditor(id) {
+  editingStoryId = id != null ? id : null;
+  const s = editingStoryId != null ? STORIES.find((x) => x.id === editingStoryId) : null;
+  document.getElementById('storyEditorTitle').textContent = s ? 'Modifier la story' : 'Nouvelle story';
+  document.getElementById('storyTitleInput').value = s ? (s.title || '') : '';
+  document.getElementById('storyDescInput').value = s ? (s.desc || '') : '';
+  draftPhotos = s && s.photos ? s.photos.slice() : [];
+  document.getElementById('storyDeleteBtn').classList.toggle('hidden', !s);
+  document.getElementById('storyQuota').classList.add('hidden');
+  renderDraftPhotos();
+  document.getElementById('storyEditor').classList.remove('hidden');
+}
+function closeStoryEditor() {
+  document.getElementById('storyEditor').classList.add('hidden');
+  editingStoryId = null;
+  draftPhotos = [];
+}
+function renderDraftPhotos() {
+  const host = document.getElementById('storyPhotos');
+  host.innerHTML = '';
+  draftPhotos.forEach((src, i) => {
+    const t = document.createElement('div');
+    t.className = 'sp-thumb';
+    t.innerHTML = `<img src="${src}" alt="" /><button type="button" aria-label="Retirer">✕</button>`;
+    t.querySelector('img').addEventListener('click', () => openLightbox(src));
+    t.querySelector('button').addEventListener('click', (e) => {
+      e.stopPropagation();
+      draftPhotos.splice(i, 1);
+      renderDraftPhotos();
+    });
+    host.appendChild(t);
+  });
+}
+
+/** Redimensionne une image (max 1200 px, JPEG 0.72) avant stockage. */
+function resizePhoto(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 1200;
+        let { width, height } = img;
+        if (width > max || height > max) {
+          if (width >= height) { height = Math.round(height * max / width); width = max; }
+          else { width = Math.round(width * max / height); height = max; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.72));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+document.getElementById('storyPhotoInput').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []);
+  for (const f of files) {
+    try { draftPhotos.push(await resizePhoto(f)); }
+    catch (err) { /* ignore fichier illisible */ }
+  }
+  e.target.value = '';
+  renderDraftPhotos();
+});
+
+document.getElementById('newStoryBtn').addEventListener('click', () => openStoryEditor(null));
+document.getElementById('storyCancelBtn').addEventListener('click', closeStoryEditor);
+document.getElementById('storySaveBtn').addEventListener('click', () => {
+  const title = document.getElementById('storyTitleInput').value.trim();
+  const desc = document.getElementById('storyDescInput').value.trim();
+  if (!title && !desc && draftPhotos.length === 0) { closeStoryEditor(); return; }
+
+  if (editingStoryId != null) {
+    const s = STORIES.find((x) => x.id === editingStoryId);
+    if (s) { s.title = title; s.desc = desc; s.photos = draftPhotos.slice(); }
+  } else {
+    STORIES.unshift({ id: storyId(), title, desc, photos: draftPhotos.slice(), created: new Date().toISOString() });
+  }
+
+  if (!saveStories()) {
+    document.getElementById('storyQuota').textContent =
+      "Stockage plein : réduis le nombre de photos et réessaie.";
+    document.getElementById('storyQuota').classList.remove('hidden');
+    // on annule l'ajout non persistable
+    STORIES = loadStories();
+    return;
+  }
+  renderStories();
+  closeStoryEditor();
+  toast('📖 Story enregistrée');
+});
+document.getElementById('storyDeleteBtn').addEventListener('click', () => {
+  if (editingStoryId == null) return;
+  if (!confirm('Supprimer cette story ?')) return;
+  STORIES = STORIES.filter((x) => x.id !== editingStoryId);
+  saveStories();
+  renderStories();
+  closeStoryEditor();
+  toast('🗑️ Story supprimée');
+});
+
+/* ---- Lightbox ---- */
+function openLightbox(src) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.remove('hidden');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.add('hidden');
+  document.getElementById('lightboxImg').src = '';
+}
+document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+document.getElementById('lightbox').addEventListener('click', (e) => {
+  if (e.target.id === 'lightbox') closeLightbox();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!document.getElementById('lightbox').classList.contains('hidden')) { closeLightbox(); return; }
+  if (!document.getElementById('storyEditor').classList.contains('hidden')) { closeStoryEditor(); }
+});
+
+/* ---- Ouverture / fermeture du journal ---- */
+function toggleJournal(open) {
+  const j = document.getElementById('storyJournal');
+  const show = open != null ? open : j.classList.contains('hidden');
+  j.classList.toggle('hidden', !show);
+  document.getElementById('tabbar').style.display = show ? 'none' : '';
+  document.querySelectorAll('.page').forEach((p) => { p.style.visibility = show ? 'hidden' : ''; });
+  document.querySelector('.topbar').style.display = show ? 'none' : '';
+  if (show) { renderStories(); window.scrollTo(0, 0); }
+}
+document.getElementById('journalToggle').addEventListener('click', () => toggleJournal(true));
+document.getElementById('journalClose').addEventListener('click', () => toggleJournal(false));
+
+/* -------------------------------------------------------------------------
+   10. Réinitialisation globale
+   ------------------------------------------------------------------------- */
+document.getElementById('resetAllBtn').addEventListener('click', () => {
+  if (!confirm('Effacer TOUTES les données du quest (semaine, historique, records) ? Le story journal n\'est pas touché. Action irréversible.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  STATE = loadState();
+  ensureCurrentWeek(STATE);
+  recomputeAllTime(STATE);
+  saveState(STATE);
+  renderAll();
+  toast('🧹 Données du quest effacées');
+});
+
+/* -------------------------------------------------------------------------
+   11. Horloge : compte à rebours en direct + passage de semaine
+   ------------------------------------------------------------------------- */
+function tick() {
+  updateCountdown();
+  // Passage de semaine à la frontière du lundi
+  if (isoWeek(new Date()).key !== STATE.currentWeek) {
+    ensureCurrentWeek(STATE);
+    recomputeAllTime(STATE);
+    saveState(STATE);
+    renderAll();
+    toast('🔄 Nouvelle semaine : compteurs remis à zéro !');
+  }
+}
+setInterval(tick, 1000);
+
+/* -------------------------------------------------------------------------
+   12. Démarrage
    ------------------------------------------------------------------------- */
 (function init() {
   const didReset = ensureCurrentWeek(STATE);

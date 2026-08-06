@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0b0f1a" />
+  <meta name="theme-color" content="#0a0b0a" />
   <title>Hyrox Journal — Défi hebdo gamifié</title>
-  <meta name="description" content="Journal gamifié d'entraînement Hyrox : débloque tes titres chaque semaine, suis ton volume sur un diagramme d'araignée et bats tes records all-time." />
+  <meta name="description" content="Journal d'entraînement Hyrox gamifié : titres hebdomadaires, diagramme d'araignée, progression, records all-time et story journal." />
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
   <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
@@ -14,6 +14,7 @@
 </head>
 <body>
   <div class="app">
+    <!-- ===================== TOP BAR ===================== -->
     <header class="topbar">
       <div class="brand">
         <span class="brand-logo">
@@ -22,79 +23,172 @@
           <span class="brand-logo-fallback">🐱</span>
         </span>
         <div>
-          <h1>Hyrox Journal</h1>
-          <p class="brand-sub">Ton défi hebdomadaire gamifié</p>
+          <h1>HYROX<span class="brand-accent"> JOURNAL</span></h1>
+          <p class="brand-sub">TRAIN · COMPETE · IMPROVE</p>
         </div>
       </div>
-      <div class="week-pill">
-        <span class="week-label">Semaine en cours</span>
-        <strong id="weekRange">—</strong>
-        <span id="weekReset" class="week-reset">—</span>
-      </div>
+      <button id="journalToggle" class="journal-btn" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H18a2 2 0 0 1 2 2v13a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V5.5Z"/><path d="M8 4v16"/></svg>
+        <span>Journal</span>
+      </button>
     </header>
 
-    <!-- SAISIE -->
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Semaine en cours</h2>
-        <p class="muted">Mets à jour ton volume de la semaine. Il se réinitialise chaque lundi.</p>
+    <!-- ===================== PAGE : SEMAINE ===================== -->
+    <section class="page active" id="page-week" data-page="week">
+      <div class="week-banner">
+        <div class="wb-top">
+          <span class="wb-tag" id="weekTag">W--</span>
+          <span class="wb-range" id="weekRange">—</span>
+        </div>
+        <div class="wb-count">
+          <span class="wb-count-label">RÉINITIALISATION DANS</span>
+          <span class="wb-count-val" id="countdown">--</span>
+        </div>
       </div>
-      <div id="inputGrid" class="input-grid"></div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Semaine en cours</h2>
+          <p class="muted">Mets à jour ton volume de la semaine. Il se réinitialise chaque lundi.</p>
+        </div>
+        <div id="inputGrid" class="input-grid"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Diagramme d'araignée</h2>
+          <p class="muted">Ton volume face aux 6 paliers, de <em>paresseux</em> à <em>élite</em>.</p>
+        </div>
+        <div class="radar-wrap">
+          <div id="radar" class="radar"></div>
+          <ul id="radarLegend" class="radar-legend"></ul>
+        </div>
+      </div>
     </section>
 
-    <!-- TITRES ACTUELS -->
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Mes succès de la semaine</h2>
-        <p class="muted">Ton niveau actuel dans chaque catégorie.</p>
-      </div>
-      <div id="currentBadges" class="badges-row"></div>
-    </section>
-
-    <!-- RADAR -->
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Diagramme d'araignée</h2>
-        <p class="muted">Ton volume réalisé face aux 6 paliers, de <em>paresseux</em> à <em>élite</em>.</p>
-      </div>
-      <div class="radar-wrap">
-        <div id="radar" class="radar"></div>
-        <ul id="radarLegend" class="radar-legend"></ul>
+    <!-- ===================== PAGE : PROGRESSION ===================== -->
+    <section class="page" id="page-progress" data-page="progress">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Progression</h2>
+          <p class="muted">Ce qu'il te reste pour débloquer le prochain titre.</p>
+        </div>
+        <div id="gauges" class="gauges"></div>
       </div>
     </section>
 
-    <!-- JAUGES -->
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Progression vers l'objectif suivant</h2>
-        <p class="muted">Ce qu'il te reste pour débloquer le prochain titre.</p>
+    <!-- ===================== PAGE : SUCCÈS ===================== -->
+    <section class="page" id="page-titles" data-page="titles">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Mes succès de la semaine</h2>
+          <p class="muted">Ton niveau actuel dans chaque catégorie.</p>
+        </div>
+        <div id="currentBadges" class="badges-row"></div>
       </div>
-      <div id="gauges" class="gauges"></div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Galerie des titres</h2>
+          <p class="muted">Fais défiler les titres débloqués et ceux encore à conquérir 🔒.</p>
+        </div>
+        <div id="titleGallery" class="title-gallery"></div>
+      </div>
     </section>
 
-    <!-- TITRES DEBLOQUES / A DEBLOQUER -->
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Galerie des titres</h2>
-        <p class="muted">Fais défiler les titres débloqués et ceux encore à conquérir cette semaine 🔒.</p>
+    <!-- ===================== PAGE : HISTORIQUE ===================== -->
+    <section class="page" id="page-history" data-page="history">
+      <div class="panel">
+        <div class="seg" id="histSeg">
+          <button class="seg-btn active" data-view="weeks" type="button">Semaines</button>
+          <button class="seg-btn" data-view="alltime" type="button">All-time 👑</button>
+        </div>
+
+        <div id="histWeeksView">
+          <div class="panel-head"><h2>Semaines passées</h2>
+            <p class="muted">Le détail de chaque semaine close, plus récente en tête.</p></div>
+          <div id="history" class="history"></div>
+        </div>
+
+        <div id="histAllTimeView" class="hidden">
+          <div class="panel-head"><h2>Records all-time 👑</h2>
+            <p class="muted">Le plus haut volume atteint sur la semaine en cours ou passée.</p></div>
+          <div id="allTime" class="alltime-grid"></div>
+        </div>
       </div>
-      <div id="titleGallery" class="title-gallery"></div>
+
+      <div class="footer">
+        <button id="resetAllBtn" class="ghost-btn danger" type="button">Tout effacer</button>
+        <p class="footer-note">Données stockées localement sur cet appareil (localStorage).</p>
+      </div>
     </section>
 
-    <!-- HISTORIQUE -->
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Historique &amp; records</h2>
-        <p class="muted">Tes records all-time et le détail de chaque semaine passée.</p>
-      </div>
-      <div id="allTime" class="alltime-grid"></div>
-      <div id="history" class="history"></div>
-    </section>
+    <!-- ===================== STORY JOURNAL (overlay) ===================== -->
+    <div id="storyJournal" class="story-journal hidden">
+      <header class="sj-head">
+        <div>
+          <h2>Story Journal</h2>
+          <p class="muted">Tes séances marquantes, en photos.</p>
+        </div>
+        <button id="journalClose" class="journal-btn close" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          <span>Fermer</span>
+        </button>
+      </header>
+      <button id="newStoryBtn" class="btn-volt" type="button">＋ Nouvelle story</button>
+      <div id="storyGrid" class="story-grid"></div>
+      <p id="storyEmpty" class="empty sj-empty">Aucune story pour l'instant. Ajoute ta première séance marquante ✦</p>
+    </div>
 
-    <footer class="footer">
-      <button id="resetAllBtn" class="ghost-btn danger" type="button">Tout effacer</button>
-      <p class="footer-note">Données stockées localement sur cet appareil (localStorage).</p>
-    </footer>
+    <!-- Éditeur de story -->
+    <div id="storyEditor" class="modal hidden">
+      <div class="modal-card">
+        <h3 id="storyEditorTitle">Nouvelle story</h3>
+        <label class="field-label" for="storyTitleInput">Titre</label>
+        <input id="storyTitleInput" class="field" type="text" maxlength="80" placeholder="Ex. PR gainage 15 min 🔥" />
+        <label class="field-label" for="storyDescInput">Description</label>
+        <textarea id="storyDescInput" class="field" rows="4" maxlength="600" placeholder="Raconte ta séance…"></textarea>
+        <label class="field-label">Photos</label>
+        <div id="storyPhotos" class="story-photos"></div>
+        <label class="photo-add">
+          <input id="storyPhotoInput" type="file" accept="image/*" multiple hidden />
+          <span>＋ Ajouter des photos</span>
+        </label>
+        <p id="storyQuota" class="quota-msg hidden"></p>
+        <div class="modal-actions">
+          <button id="storyDeleteBtn" class="ghost-btn danger hidden" type="button">Supprimer</button>
+          <span class="spacer"></span>
+          <button id="storyCancelBtn" class="ghost-btn" type="button">Annuler</button>
+          <button id="storySaveBtn" class="btn-volt" type="button">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lightbox photo -->
+    <div id="lightbox" class="lightbox hidden">
+      <button id="lightboxClose" class="lightbox-close" type="button" aria-label="Fermer">✕</button>
+      <img id="lightboxImg" alt="" />
+    </div>
+
+    <!-- ===================== BOTTOM TAB BAR ===================== -->
+    <nav class="tabbar" id="tabbar">
+      <button class="tab active" data-tab="week" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
+        <span>Semaine</span>
+      </button>
+      <button class="tab" data-tab="progress" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+        <span>Progression</span>
+      </button>
+      <button class="tab" data-tab="titles" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.5 5 5.5.8-4 3.9.95 5.5L12 21l-4.9-2.6L8 12.9l-4-3.9L9.5 8 12 3Z"/></svg>
+        <span>Succès</span>
+      </button>
+      <button class="tab" data-tab="history" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 8v4l3 2"/></svg>
+        <span>Historique</span>
+      </button>
+    </nav>
   </div>
 
   <script src="app.js"></script>

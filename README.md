@@ -7,9 +7,13 @@ des semaines passées et met en avant tes **records all-time**.
 ## ✨ Fonctionnalités
 
 - **Saisie hebdomadaire** de ton volume pour 5 catégories : Burpees, Wallballs, Fentes chargées, Course, Gainage.
-  Pour chaque exercice, deux boutons distincts :
-  - **Ajouter à la semaine en cours** — cumule la valeur saisie au total de la semaine.
-  - **Écraser les données de la semaine** — remplace le total de la semaine par la valeur saisie.
+  Le total de chaque exercice est **éditable** (bouton **Sauvegarder**), avec des ajouts
+  rapides (+5 / +10 / …) et un bouton **Remise à zéro** par exercice.
+- **Navigation par barre d'onglets en bas** (inspirée de Sales Quest) : `Semaine · Progression · Succès · Historique`.
+- **Compte à rebours en direct** vers le prochain lundi 00:00, au format `Xj HH:MM:SS`.
+- **Story Journal** (bouton en haut à droite) : une galerie mosaïque de tes séances marquantes
+  (titre, description, plusieurs photos, lightbox plein écran). **Sans champ prix.**
+  Photos redimensionnées dans le navigateur (max 1200 px) et stockées à part.
 - **Réinitialisation automatique chaque lundi** (semaine ISO). Le volume de la semaine écoulée est archivé.
 - **Historique consultable** de chaque semaine passée, avec le titre atteint dans chaque catégorie.
 - **Records all-time** par catégorie : recalculés comme le **plus haut volume atteint** sur toutes les
@@ -43,12 +47,25 @@ des semaines passées et met en avant tes **records all-time**.
 ## 🗂️ Structure
 
 ```
-index.html     # structure de la page
-styles.css     # thème sombre, badges, radar, jauges...
-app.js         # logique : paliers, titres, semaine ISO, persistance localStorage
-logo.png       # logo de l'app (en-tête + favicon) — à déposer ici
-netlify.toml   # config Netlify (site statique, publish = ".")
+index.html            # pages à onglets, barre de navigation, story journal, lightbox
+styles.css            # thème Hyrox (noir + volt), badges, radar, jauges, journal
+app.js                # paliers, titres, semaine ISO, radar, story journal, localStorage
+logo.png              # logo de l'app (en-tête) — à déposer ici
+icon-192/512.png      # icônes favicon + PWA (dérivées de logo.png)
+manifest.webmanifest  # métadonnées PWA (icône au téléchargement/installation)
+netlify.toml          # config Netlify (site statique, publish = ".")
 ```
+
+## 🎨 Thème
+
+Charte inspirée de l'univers **Hyrox** : fond noir, accent **volt** (jaune-vert néon),
+typographie athlétique en capitales italiques, icônes ligne. Les 7 couleurs de badge
+(blanc → violet) restent imposées par la gamification.
+
+## 💾 Données (localStorage)
+
+- `hyrox-journal-v1` — quest hebdomadaire (semaine en cours, historique, records).
+- `hyrox-journal-stories-v1` — story journal (indépendant du quest).
 
 ## 🖼️ Logo & icône d'application
 
