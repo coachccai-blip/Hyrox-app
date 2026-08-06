@@ -1,0 +1,12 @@
+# Configuration Netlify — site statique, aucun build requis.
+# Il suffit de glisser-déposer ce dossier sur https://app.netlify.com/drop
+
+[build]
+  publish = "."
+  command = ""
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f1a" />
+  <title>Hyrox Journal — Défi hebdo gamifié</title>
+  <meta name="description" content="Journal gamifié d'entraînement Hyrox : débloque tes titres chaque semaine, suis ton volume sur un diagramme d'araignée et bats tes records all-time." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-logo">🏆</span>
+        <div>
+          <h1>Hyrox Journal</h1>
+          <p class="brand-sub">Ton défi hebdomadaire gamifié</p>
+        </div>
+      </div>
+      <div class="week-pill">
+        <span class="week-label">Semaine en cours</span>
+        <strong id="weekRange">—</strong>
+        <span id="weekReset" class="week-reset">—</span>
+      </div>
+    </header>
+
+    <!-- SAISIE -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Ma saisie de la semaine</h2>
+        <p class="muted">Ajoute ton volume au fil de tes séances. Tout se réinitialise chaque lundi.</p>
+      </div>
+      <div id="inputGrid" class="input-grid"></div>
+    </section>
+
+    <!-- TITRES ACTUELS -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Mes titres de la semaine</h2>
+        <p class="muted">Ton niveau actuel dans chaque catégorie.</p>
+      </div>
+      <div id="currentBadges" class="badges-row"></div>
+    </section>
+
+    <!-- RADAR -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Diagramme d'araignée</h2>
+        <p class="muted">Ton volume réalisé face aux 6 paliers, de <em>paresseux</em> à <em>élite</em>.</p>
+      </div>
+      <div class="radar-wrap">
+        <div id="radar" class="radar"></div>
+        <ul id="radarLegend" class="radar-legend"></ul>
+      </div>
+    </section>
+
+    <!-- JAUGES -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Progression vers l'objectif suivant</h2>
+        <p class="muted">Ce qu'il te reste pour débloquer le prochain titre.</p>
+      </div>
+      <div id="gauges" class="gauges"></div>
+    </section>
+
+    <!-- TITRES DEBLOQUES / A DEBLOQUER -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Galerie des titres</h2>
+        <p class="muted">Fais défiler les titres débloqués et ceux encore à conquérir cette semaine 🔒.</p>
+      </div>
+      <div id="titleGallery" class="title-gallery"></div>
+    </section>
+
+    <!-- HISTORIQUE -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Historique &amp; records</h2>
+        <p class="muted">Tes records all-time et le détail de chaque semaine passée.</p>
+      </div>
+      <div id="allTime" class="alltime-grid"></div>
+      <div id="history" class="history"></div>
+    </section>
+
+    <footer class="footer">
+      <button id="closeWeekBtn" class="ghost-btn" type="button">Clôturer la semaine maintenant</button>
+      <button id="resetAllBtn" class="ghost-btn danger" type="button">Tout effacer</button>
+      <p class="footer-note">Données stockées localement sur cet appareil (localStorage).</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
