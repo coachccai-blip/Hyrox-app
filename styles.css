@@ -333,6 +333,7 @@ em { color: var(--volt); font-style: normal; font-weight: 700; }
 .field { width: 100%; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 10px; color: var(--text); padding: 10px 12px; font-size: 14px; font-family: inherit; }
 .field:focus { outline: none; border-color: var(--volt); }
 textarea.field { resize: vertical; }
+input[type="date"].field { color-scheme: dark; }
 .story-photos { display: flex; flex-wrap: wrap; gap: 8px; }
 .story-photos:empty { display: none; }
 .sp-thumb { position: relative; width: 72px; height: 72px; border-radius: 9px; overflow: hidden; border: 1px solid var(--line); }

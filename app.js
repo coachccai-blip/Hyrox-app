@@ -751,11 +751,26 @@ function storyId() {
   const max = STORIES.reduce((m, s) => Math.max(m, s.id || 0), 0);
   return max + 1;
 }
-function fmtStoryDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
+function fmtStoryDate(val) {
+  if (!val) return '';
+  let d;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(val);
+  if (m) d = new Date(+m[1], +m[2] - 1, +m[3]); // date locale, pas de décalage UTC
+  else d = new Date(val);
   if (isNaN(d)) return '';
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** Date du jour au format "YYYY-MM-DD" (local). */
+function todayISODate() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** Clé de tri d'une story (date renseignée sinon date de création). */
+function storyDateKey(s) {
+  return s.date || (s.created ? s.created.slice(0, 10) : '');
 }
 
 function renderStories() {
@@ -764,11 +779,15 @@ function renderStories() {
   grid.innerHTML = '';
   empty.classList.toggle('hidden', STORIES.length > 0);
 
-  STORIES.forEach((s) => {
+  // Affichage trié par date (la plus récente en tête)
+  const ordered = STORIES.slice().sort((a, b) => storyDateKey(b).localeCompare(storyDateKey(a)));
+
+  ordered.forEach((s) => {
     const card = document.createElement('div');
     card.className = 'story-card';
     const cover = (s.photos && s.photos[0]) || null;
     const count = s.photos ? s.photos.length : 0;
+    const dateTxt = fmtStoryDate(s.date || s.created);
     card.innerHTML = `
       <div class="story-cover">
         ${cover ? `<img src="${cover}" alt="" />` : '<div class="no-photo">✦</div>'}
@@ -777,7 +796,7 @@ function renderStories() {
       <div class="story-body">
         <p class="story-title">${escapeHtml(s.title || 'Sans titre')}</p>
         ${s.desc ? `<p class="story-desc">${escapeHtml(s.desc)}</p>` : ''}
-        <div class="story-date">${fmtStoryDate(s.created)}</div>
+        ${dateTxt ? `<div class="story-date">🗓️ ${dateTxt}</div>` : ''}
       </div>
     `;
     card.addEventListener('click', () => openStoryEditor(s.id));
@@ -797,6 +816,7 @@ function openStoryEditor(id) {
   const s = editingStoryId != null ? STORIES.find((x) => x.id === editingStoryId) : null;
   document.getElementById('storyEditorTitle').textContent = s ? 'Modifier la story' : 'Nouvelle story';
   document.getElementById('storyTitleInput').value = s ? (s.title || '') : '';
+  document.getElementById('storyDateInput').value = s ? (s.date || (s.created ? s.created.slice(0, 10) : '')) : todayISODate();
   document.getElementById('storyDescInput').value = s ? (s.desc || '') : '';
   draftPhotos = s && s.photos ? s.photos.slice() : [];
   document.getElementById('storyDeleteBtn').classList.toggle('hidden', !s);
@@ -868,13 +888,14 @@ document.getElementById('storyCancelBtn').addEventListener('click', closeStoryEd
 document.getElementById('storySaveBtn').addEventListener('click', () => {
   const title = document.getElementById('storyTitleInput').value.trim();
   const desc = document.getElementById('storyDescInput').value.trim();
+  const date = document.getElementById('storyDateInput').value || todayISODate();
   if (!title && !desc && draftPhotos.length === 0) { closeStoryEditor(); return; }
 
   if (editingStoryId != null) {
     const s = STORIES.find((x) => x.id === editingStoryId);
-    if (s) { s.title = title; s.desc = desc; s.photos = draftPhotos.slice(); }
+    if (s) { s.title = title; s.desc = desc; s.date = date; s.photos = draftPhotos.slice(); }
   } else {
-    STORIES.unshift({ id: storyId(), title, desc, photos: draftPhotos.slice(), created: new Date().toISOString() });
+    STORIES.unshift({ id: storyId(), title, date, desc, photos: draftPhotos.slice(), created: new Date().toISOString() });
   }
 
   if (!saveStories()) {
