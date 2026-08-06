@@ -219,21 +219,23 @@ function commitValue(ex, before, newValue) {
   renderAll();
   if (after > before) {
     toast(`${ex.emoji} Nouveau titre débloqué : ${titleFor(ex, after)} !`);
+    return true;
   }
+  return false;
 }
 
-/** Ajoute (ou retire) du volume à la semaine en cours. */
+/** Ajoute (ou retire) du volume à la semaine en cours. Renvoie true si un titre est débloqué. */
 function addVolume(exId, amount) {
   const ex = EXERCISES.find((e) => e.id === exId);
   const before = levelIndexFor(STATE.current[exId] || 0, ex.tiers);
-  commitValue(ex, before, (STATE.current[exId] || 0) + amount);
+  return commitValue(ex, before, (STATE.current[exId] || 0) + amount);
 }
 
-/** Écrase le total de la semaine en cours par une valeur absolue. */
+/** Fixe le total de la semaine en cours à une valeur absolue. Renvoie true si un titre est débloqué. */
 function setVolume(exId, value) {
   const ex = EXERCISES.find((e) => e.id === exId);
   const before = levelIndexFor(STATE.current[exId] || 0, ex.tiers);
-  commitValue(ex, before, value);
+  return commitValue(ex, before, value);
 }
 
 /* ---- Saisie ---- */
@@ -254,17 +256,14 @@ function renderInputs() {
           <div class="ex-title-mini">${titleFor(ex, lvl)}</div>
         </div>
       </div>
-      <div class="ex-total">
-        <span class="val">${fmt(ex, value)}</span>
+      <div class="ex-total-edit">
+        <input class="total-input" type="number" inputmode="decimal" min="0" step="${ex.decimals ? '0.1' : '1'}" value="${fmt(ex, value)}" aria-label="Total ${ex.name}" />
         <span class="unit">${ex.unit}</span>
       </div>
+      <button type="button" class="btn-save">Sauvegarder</button>
       <div class="quick-adds"></div>
-      <div class="custom-add">
-        <input type="number" inputmode="decimal" min="0" step="${ex.decimals ? '0.1' : '1'}" placeholder="Valeur (${ex.unit})" />
-      </div>
       <div class="custom-actions">
-        <button type="button" class="btn-add">Ajouter à la semaine en cours</button>
-        <button type="button" class="btn-set">Écraser les données de la semaine</button>
+        <button type="button" class="btn-reset">Remise à zéro</button>
       </div>
     `;
 
@@ -280,33 +279,34 @@ function renderInputs() {
     minus.type = 'button';
     minus.className = 'minus';
     minus.textContent = '−';
-    minus.title = 'Retirer le dernier quick-add';
+    minus.title = `Retirer ${ex.quick[0]} ${ex.unit}`;
     minus.addEventListener('click', () => addVolume(ex.id, -ex.quick[0]));
     quick.appendChild(minus);
 
-    const input = card.querySelector('input');
-    const addBtn = card.querySelector('.btn-add');
-    const setBtn = card.querySelector('.btn-set');
+    const totalInput = card.querySelector('.total-input');
+    const saveBtn = card.querySelector('.btn-save');
+    const resetBtn = card.querySelector('.btn-reset');
 
-    const doAdd = () => {
-      const v = parseFloat(input.value);
-      if (!isNaN(v) && v !== 0) addVolume(ex.id, v);
-      input.value = '';
+    const doSave = () => {
+      const v = parseFloat(totalInput.value);
+      if (isNaN(v)) { totalInput.value = fmt(ex, STATE.current[ex.id] || 0); return; }
+      const leveledUp = setVolume(ex.id, v);
+      if (!leveledUp) {
+        const saved = STATE.current[ex.id] || 0;
+        const savedTxt = ex.id === 'gainage' ? fmtSeconds(saved) : `${fmt(ex, saved)} ${ex.unit}`;
+        toast(`💾 ${ex.name} enregistré : ${savedTxt}`);
+      }
     };
-    const doSet = () => {
-      const v = parseFloat(input.value);
-      if (isNaN(v)) { input.value = ''; return; }
+    const doReset = () => {
       const cur = STATE.current[ex.id] || 0;
-      const curTxt = ex.id === 'gainage' ? fmtSeconds(cur) : `${fmt(ex, cur)} ${ex.unit}`;
-      const newTxt = ex.id === 'gainage' ? fmtSeconds(v) : `${fmt(ex, v)} ${ex.unit}`;
-      if (cur > 0 && !confirm(`Écraser ${ex.name} : remplacer ${curTxt} par ${newTxt} pour la semaine en cours ?`)) return;
-      setVolume(ex.id, v);
-      input.value = '';
+      if (cur > 0 && !confirm(`Remettre ${ex.name} à zéro pour la semaine en cours ?`)) return;
+      setVolume(ex.id, 0);
+      toast(`↺ ${ex.name} remis à zéro`);
     };
 
-    addBtn.addEventListener('click', doAdd);
-    setBtn.addEventListener('click', doSet);
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doAdd(); });
+    saveBtn.addEventListener('click', doSave);
+    resetBtn.addEventListener('click', doReset);
+    totalInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSave(); });
 
     grid.appendChild(card);
   });

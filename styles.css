@@ -163,42 +163,53 @@ em { color: var(--text); font-style: normal; font-weight: 600; }
 .quick-adds button:active { transform: scale(0.96); }
 .quick-adds button.minus { color: var(--muted); flex: 0 0 auto; min-width: 44px; }
 
-.custom-add { display: flex; gap: 8px; }
-.custom-add input {
+/* Total éditable */
+.ex-total-edit { display: flex; align-items: center; gap: 8px; }
+.total-input {
   flex: 1;
+  min-width: 0;
   background: var(--bg-soft);
   border: 1px solid var(--line);
   border-radius: 10px;
   color: var(--text);
-  padding: 9px 10px;
-  font-size: 14px;
-  min-width: 0;
+  padding: 6px 12px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
-.custom-add input:focus { outline: none; border-color: var(--accent); }
+.total-input:focus { outline: none; border-color: var(--accent); }
+.ex-total-edit .unit { flex: 0 0 auto; font-size: 13px; color: var(--muted); }
+
+.btn-save {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(180deg, var(--accent), #6743e6);
+  transition: transform 0.05s ease, filter 0.15s ease;
+}
+.btn-save:hover { filter: brightness(1.08); }
+.btn-save:active { transform: scale(0.98); }
 
 .custom-actions { display: flex; flex-direction: column; gap: 8px; }
-.custom-actions button {
-  border: 1px solid transparent;
+.btn-reset {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--muted);
   border-radius: 10px;
   padding: 10px 12px;
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
-  line-height: 1.2;
-  transition: transform 0.05s ease, filter 0.15s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.05s ease;
 }
-.custom-actions button:active { transform: scale(0.98); }
-.custom-actions .btn-add {
-  color: #fff;
-  background: linear-gradient(180deg, var(--accent), #6743e6);
-}
-.custom-actions .btn-add:hover { filter: brightness(1.08); }
-.custom-actions .btn-set {
-  color: var(--text);
-  background: var(--panel-2);
-  border-color: var(--line);
-}
-.custom-actions .btn-set:hover { border-color: var(--lvl-survolte); color: #ffd0d0; }
+.btn-reset:hover { border-color: var(--lvl-survolte); color: #ffd0d0; }
+.btn-reset:active { transform: scale(0.98); }
 
 /* ---------- Badges ---------- */
 .badges-row {
