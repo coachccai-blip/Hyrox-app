@@ -6,14 +6,20 @@
   <meta name="theme-color" content="#0b0f1a" />
   <title>Hyrox Journal — Défi hebdo gamifié</title>
   <meta name="description" content="Journal gamifié d'entraînement Hyrox : débloque tes titres chaque semaine, suis ton volume sur un diagramme d'araignée et bats tes records all-time." />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>" />
+  <link rel="icon" href="logo.png" />
+  <link rel="apple-touch-icon" href="logo.png" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐱</text></svg>" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div class="brand">
-        <span class="brand-logo">🏆</span>
+        <span class="brand-logo">
+          <img src="logo.png" alt="Hyrox Journal"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='grid';" />
+          <span class="brand-logo-fallback">🐱</span>
+        </span>
         <div>
           <h1>Hyrox Journal</h1>
           <p class="brand-sub">Ton défi hebdomadaire gamifié</p>

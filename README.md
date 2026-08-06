@@ -46,8 +46,16 @@ des semaines passées et met en avant tes **records all-time**.
 index.html     # structure de la page
 styles.css     # thème sombre, badges, radar, jauges...
 app.js         # logique : paliers, titres, semaine ISO, persistance localStorage
+logo.png       # logo de l'app (en-tête + favicon) — à déposer ici
 netlify.toml   # config Netlify (site statique, publish = ".")
 ```
+
+## 🖼️ Logo
+
+L'en-tête et le favicon utilisent un fichier **`logo.png`** placé à la racine
+(à côté de `index.html`). Dépose simplement ton image sous ce nom exact.
+Format conseillé : carré (par ex. 512×512 px). Si `logo.png` est absent,
+l'app affiche automatiquement un emoji 🐱 de secours — rien n'est cassé.
 
 ## 💾 Données
 

@@ -53,8 +53,28 @@ html, body {
 }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand-logo {
-  font-size: 34px;
-  filter: drop-shadow(0 4px 10px rgba(124, 92, 255, 0.5));
+  display: inline-flex;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+}
+.brand-logo img {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(217, 249, 60, 0.15);
+}
+.brand-logo-fallback {
+  display: none;              /* affiché seulement si logo.png est absent */
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  font-size: 30px;
+  border-radius: 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
 }
 .brand h1 {
   margin: 0;
