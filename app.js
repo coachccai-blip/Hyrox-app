@@ -648,6 +648,14 @@ function sortHistory() {
   STATE.history.sort((a, b) => String(b.week).localeCompare(String(a.week)));
 }
 
+/** Clé ISO de la semaine précédant la semaine en cours (dernière semaine passée). */
+function prevWeekKey() {
+  const { monday } = weekBounds(new Date());
+  const d = new Date(monday);
+  d.setDate(d.getDate() - 7);
+  return isoWeek(d).key;
+}
+
 /* ---- En-tête semaine (bandeau + compte à rebours en direct) ---- */
 function renderWeekHeader() {
   const now = new Date();
@@ -1010,6 +1018,7 @@ function openWeekEditor(weekKey) {
   const pick = document.getElementById('weekPick');
   pick.value = editingWeekKey || '';
   pick.disabled = !!editingWeekKey;
+  pick.max = prevWeekKey(); // uniquement des semaines passées, jamais le futur
   document.getElementById('weekDeleteBtn').classList.toggle('hidden', !editingWeekKey);
   const msg = document.getElementById('weekEditorMsg');
   msg.classList.add('hidden'); msg.textContent = '';
@@ -1023,6 +1032,7 @@ function openWeekEditor(weekKey) {
     const inp = document.createElement('input');
     inp.type = 'number'; inp.min = '0'; inp.step = ex.decimals ? '0.1' : '1';
     inp.value = fmt(ex, v); inp.dataset.ex = ex.id;
+    inp.addEventListener('focus', () => inp.select()); // saisie remplace la valeur pré-remplie
     lab.appendChild(inp);
     host.appendChild(lab);
   });
@@ -1245,6 +1255,58 @@ document.getElementById('minReset').addEventListener('click', minReset);
   });
 })();
 
+/* Presets de minuteur */
+const MIN_PRESETS_KEY = 'hyrox-timer-min-presets-v1';
+let minPresets = loadMinPresets();
+function loadMinPresets() {
+  try { const a = JSON.parse(localStorage.getItem(MIN_PRESETS_KEY)); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function saveMinPresets() {
+  try { localStorage.setItem(MIN_PRESETS_KEY, JSON.stringify(minPresets)); } catch (e) { /* quota */ }
+}
+function renderMinPresets() {
+  const host = document.getElementById('minPresetList');
+  host.innerHTML = '';
+  if (!minPresets.length) {
+    const p = document.createElement('p'); p.className = 'empty';
+    p.textContent = 'Aucun preset de minuteur enregistré.';
+    host.appendChild(p); return;
+  }
+  minPresets.forEach((pr, i) => {
+    const total = (pr.m || 0) * 60 + (pr.s || 0);
+    const el = document.createElement('div');
+    el.className = 'preset-item';
+    el.innerHTML = `<div><div class="pi-name">${escapeHtml(pr.name)}</div>
+      <div class="pi-detail">${fmtClock(total * 1000)}</div></div>
+      <span class="spacer"></span>
+      <button class="pi-load" type="button">Charger</button>
+      <button class="pi-del" type="button" aria-label="Supprimer">✕</button>`;
+    el.querySelector('.pi-load').addEventListener('click', () => {
+      document.getElementById('minMinutes').value = pr.m || 0;
+      document.getElementById('minSeconds').value = pr.s || 0;
+      if (!minuteur.running) { minuteur.remaining = minInputMs(); minRender(); }
+      toast(`⏱️ Minuteur « ${pr.name} » chargé`);
+    });
+    el.querySelector('.pi-del').addEventListener('click', () => {
+      minPresets.splice(i, 1); saveMinPresets(); renderMinPresets();
+    });
+    host.appendChild(el);
+  });
+}
+document.getElementById('minSavePreset').addEventListener('click', () => {
+  const name = document.getElementById('minPresetName').value.trim();
+  if (!name) { toast('Donne un nom au preset'); return; }
+  const m = parseInt(document.getElementById('minMinutes').value) || 0;
+  const s = parseInt(document.getElementById('minSeconds').value) || 0;
+  if (m === 0 && s === 0) { toast('Règle une durée avant d\'enregistrer'); return; }
+  minPresets.push({ name: name, m: m, s: s });
+  saveMinPresets();
+  document.getElementById('minPresetName').value = '';
+  renderMinPresets();
+  toast('⏱️ Preset de minuteur enregistré');
+});
+
 /* ---- Intervalles ---- */
 const IV_PRESETS_KEY = 'hyrox-timer-presets-v1';
 let ivPresets = loadPresets();
@@ -1390,6 +1452,7 @@ document.getElementById('ivSavePreset').addEventListener('click', () => {
 /* Initialisation des affichages timer */
 minReset();
 renderPresets();
+renderMinPresets();
 
 /* -------------------------------------------------------------------------
    14. Démarrage

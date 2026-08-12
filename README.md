@@ -10,8 +10,9 @@ des semaines passées et met en avant tes **records all-time**.
   Le total de chaque exercice est **éditable** (bouton **Sauvegarder**), avec des ajouts
   rapides (+5 / +10 / …) et un bouton **Remise à zéro** par exercice.
 - **Navigation par barre d'onglets en bas** (inspirée de Sales Quest) : `Semaine · Progression · Succès · Timer · Historique`.
-- **Timer** : chronomètre (avec tours), minuteur (compte à rebours) et **entraînement par intervalles**
-  personnalisable (préparation / effort / repos / tours) avec **effets sonores** et **presets enregistrables**.
+- **Timer** : chronomètre (avec tours), minuteur (compte à rebours, **presets enregistrables**) et
+  **entraînement par intervalles** personnalisable (préparation / effort / repos / tours) avec
+  **effets sonores** et **presets enregistrables**.
 - **Historique éditable** : modifie le volume d'une semaine passée, supprime-la, ou **ajoute une semaine
   oubliée** (choix de la semaine ISO) — les records se recalculent automatiquement.
 - **Compte à rebours en direct** vers le prochain lundi 00:00, au format `Xj HH:MM:SS`.
