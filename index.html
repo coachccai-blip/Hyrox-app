@@ -96,6 +96,75 @@
       </div>
     </section>
 
+    <!-- ===================== PAGE : TIMER ===================== -->
+    <section class="page" id="page-timer" data-page="timer">
+      <div class="panel">
+        <div class="seg" id="timerSeg">
+          <button class="seg-btn active" data-mode="chrono" type="button">Chrono</button>
+          <button class="seg-btn" data-mode="minuteur" type="button">Minuteur</button>
+          <button class="seg-btn" data-mode="intervalles" type="button">Intervalles</button>
+        </div>
+
+        <label class="sound-toggle">
+          <input type="checkbox" id="soundToggle" checked />
+          <span>🔊 Sons activés</span>
+        </label>
+
+        <!-- CHRONO -->
+        <div id="mode-chrono" class="timer-mode">
+          <div class="timer-display" id="chronoDisplay">00:00.0</div>
+          <div class="timer-controls">
+            <button class="btn-volt" id="chronoStart" type="button">Démarrer</button>
+            <button class="ghost-btn" id="chronoLap" type="button">Tour</button>
+            <button class="ghost-btn" id="chronoReset" type="button">Reset</button>
+          </div>
+          <ol id="chronoLaps" class="laps"></ol>
+        </div>
+
+        <!-- MINUTEUR -->
+        <div id="mode-minuteur" class="timer-mode hidden">
+          <div class="timer-display" id="minuteurDisplay">01:00</div>
+          <div class="timer-set">
+            <label>Min <input type="number" id="minMinutes" min="0" max="99" value="1" /></label>
+            <label>Sec <input type="number" id="minSeconds" min="0" max="59" value="0" /></label>
+          </div>
+          <div class="quick-timers" id="quickTimers"></div>
+          <div class="timer-controls">
+            <button class="btn-volt" id="minStart" type="button">Démarrer</button>
+            <button class="ghost-btn" id="minReset" type="button">Reset</button>
+          </div>
+        </div>
+
+        <!-- INTERVALLES -->
+        <div id="mode-intervalles" class="timer-mode hidden">
+          <div class="interval-run" id="ivRun">
+            <div class="phase-name" id="ivPhase">Prêt</div>
+            <div class="timer-display" id="ivDisplay">00:00</div>
+            <div class="iv-round" id="ivRound">—</div>
+            <div class="timer-controls">
+              <button class="btn-volt" id="ivStart" type="button">Démarrer</button>
+              <button class="ghost-btn" id="ivStop" type="button">Stop</button>
+            </div>
+          </div>
+
+          <div class="interval-config">
+            <h3 class="cfg-title">Réglages de l'intervalle</h3>
+            <div class="cfg-grid">
+              <label>Préparation (s)<input type="number" id="ivPrep" min="0" max="600" value="10" /></label>
+              <label>Effort (s)<input type="number" id="ivWork" min="1" max="3600" value="40" /></label>
+              <label>Repos (s)<input type="number" id="ivRest" min="0" max="3600" value="20" /></label>
+              <label>Tours<input type="number" id="ivRounds" min="1" max="99" value="8" /></label>
+            </div>
+            <div class="cfg-save">
+              <input type="text" id="ivPresetName" maxlength="40" placeholder="Nom du preset (ex. Tabata)" />
+              <button class="btn-volt" id="ivSavePreset" type="button">Enregistrer</button>
+            </div>
+            <div id="presetList" class="preset-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ===================== PAGE : HISTORIQUE ===================== -->
     <section class="page" id="page-history" data-page="history">
       <div class="panel">
@@ -106,7 +175,8 @@
 
         <div id="histWeeksView">
           <div class="panel-head"><h2>Semaines passées</h2>
-            <p class="muted">Le détail de chaque semaine close, plus récente en tête.</p></div>
+            <p class="muted">Le détail de chaque semaine close. Tu peux éditer une semaine ou en ajouter une oubliée.</p></div>
+          <button id="addWeekBtn" class="btn-volt add-week-btn" type="button">＋ Ajouter une semaine</button>
           <div id="history" class="history"></div>
         </div>
 
@@ -166,6 +236,23 @@
       </div>
     </div>
 
+    <!-- Éditeur de semaine (historique) -->
+    <div id="weekEditor" class="modal hidden">
+      <div class="modal-card">
+        <h3 id="weekEditorTitle">Ajouter une semaine</h3>
+        <label class="field-label" for="weekPick">Semaine (format ISO, ex. 2026-W30)</label>
+        <input id="weekPick" class="field" type="week" placeholder="2026-W30" />
+        <div id="weekValues" class="week-values"></div>
+        <p id="weekEditorMsg" class="quota-msg hidden"></p>
+        <div class="modal-actions">
+          <button id="weekDeleteBtn" class="ghost-btn danger hidden" type="button">Supprimer</button>
+          <span class="spacer"></span>
+          <button id="weekCancelBtn" class="ghost-btn" type="button">Annuler</button>
+          <button id="weekSaveBtn" class="btn-volt" type="button">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Lightbox photo -->
     <div id="lightbox" class="lightbox hidden">
       <button id="lightboxClose" class="lightbox-close" type="button" aria-label="Fermer">✕</button>
@@ -185,6 +272,10 @@
       <button class="tab" data-tab="titles" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.5 5 5.5.8-4 3.9.95 5.5L12 21l-4.9-2.6L8 12.9l-4-3.9L9.5 8 12 3Z"/></svg>
         <span>Succès</span>
+      </button>
+      <button class="tab" data-tab="timer" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 13V9M9 2h6M12 5V2M18.5 6.5l1.5-1.5"/></svg>
+        <span>Timer</span>
       </button>
       <button class="tab" data-tab="history" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 8v4l3 2"/></svg>

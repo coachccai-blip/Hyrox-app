@@ -630,9 +630,22 @@ function renderHistory() {
       `;
       body.appendChild(line);
     });
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'hist-edit-btn';
+    editBtn.type = 'button';
+    editBtn.textContent = '✎ Éditer cette semaine';
+    editBtn.addEventListener('click', () => openWeekEditor(h.week));
+    body.appendChild(editBtn);
+
     det.appendChild(body);
     host.appendChild(det);
   });
+}
+
+/** Trie l'historique par semaine décroissante (plus récente en tête). */
+function sortHistory() {
+  STATE.history.sort((a, b) => String(b.week).localeCompare(String(a.week)));
 }
 
 /* ---- En-tête semaine (bandeau + compte à rebours en direct) ---- */
@@ -936,7 +949,8 @@ document.getElementById('lightbox').addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!document.getElementById('lightbox').classList.contains('hidden')) { closeLightbox(); return; }
-  if (!document.getElementById('storyEditor').classList.contains('hidden')) { closeStoryEditor(); }
+  if (!document.getElementById('storyEditor').classList.contains('hidden')) { closeStoryEditor(); return; }
+  if (!document.getElementById('weekEditor').classList.contains('hidden')) { closeWeekEditor(); }
 });
 
 /* ---- Ouverture / fermeture du journal ---- */
@@ -983,7 +997,402 @@ function tick() {
 setInterval(tick, 1000);
 
 /* -------------------------------------------------------------------------
-   12. Démarrage
+   12. Éditeur de semaines passées (historique)
+   ------------------------------------------------------------------------- */
+let editingWeekKey = null;
+
+function openWeekEditor(weekKey) {
+  editingWeekKey = weekKey || null;
+  const existing = editingWeekKey ? STATE.history.find((h) => h.week === editingWeekKey) : null;
+  document.getElementById('weekEditorTitle').textContent =
+    editingWeekKey ? 'Modifier ' + weekLabel(editingWeekKey) : 'Ajouter une semaine';
+
+  const pick = document.getElementById('weekPick');
+  pick.value = editingWeekKey || '';
+  pick.disabled = !!editingWeekKey;
+  document.getElementById('weekDeleteBtn').classList.toggle('hidden', !editingWeekKey);
+  const msg = document.getElementById('weekEditorMsg');
+  msg.classList.add('hidden'); msg.textContent = '';
+
+  const host = document.getElementById('weekValues');
+  host.innerHTML = '';
+  EXERCISES.forEach((ex) => {
+    const v = existing && existing.values ? (existing.values[ex.id] || 0) : 0;
+    const lab = document.createElement('label');
+    lab.appendChild(document.createTextNode(`${ex.emoji} ${ex.name} (${ex.unit})`));
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.min = '0'; inp.step = ex.decimals ? '0.1' : '1';
+    inp.value = fmt(ex, v); inp.dataset.ex = ex.id;
+    lab.appendChild(inp);
+    host.appendChild(lab);
+  });
+  document.getElementById('weekEditor').classList.remove('hidden');
+}
+function closeWeekEditor() {
+  document.getElementById('weekEditor').classList.add('hidden');
+  editingWeekKey = null;
+}
+function weekEditorMsg(t) {
+  const m = document.getElementById('weekEditorMsg');
+  m.textContent = t; m.classList.remove('hidden');
+}
+
+document.getElementById('addWeekBtn').addEventListener('click', () => openWeekEditor(null));
+document.getElementById('weekCancelBtn').addEventListener('click', closeWeekEditor);
+document.getElementById('weekSaveBtn').addEventListener('click', () => {
+  const wk = (editingWeekKey || (document.getElementById('weekPick').value || '')).trim();
+  if (!/^\d{4}-W\d{2}$/.test(wk)) { weekEditorMsg('Semaine invalide. Format attendu : 2026-W30.'); return; }
+  if (!editingWeekKey) {
+    if (wk === STATE.currentWeek) { weekEditorMsg("C'est la semaine en cours : édite-la dans l'onglet Semaine."); return; }
+    if (wk > STATE.currentWeek) { weekEditorMsg('Cette semaine est dans le futur.'); return; }
+  }
+  const values = emptyValues();
+  document.querySelectorAll('#weekValues input').forEach((inp) => {
+    const ex = EXERCISES.find((e) => e.id === inp.dataset.ex);
+    let v = parseFloat(inp.value);
+    if (isNaN(v) || v < 0) v = 0;
+    values[inp.dataset.ex] = ex.decimals ? Math.round(v * 10) / 10 : Math.round(v);
+  });
+  const existing = STATE.history.find((h) => h.week === wk);
+  if (existing) existing.values = values;
+  else STATE.history.push({ week: wk, values });
+  sortHistory();
+  recomputeAllTime(STATE);
+  saveState(STATE);
+  renderAll();
+  closeWeekEditor();
+  toast('✅ Semaine enregistrée');
+});
+document.getElementById('weekDeleteBtn').addEventListener('click', () => {
+  if (!editingWeekKey) return;
+  if (!confirm('Supprimer ' + weekLabel(editingWeekKey) + " de l'historique ?")) return;
+  STATE.history = STATE.history.filter((h) => h.week !== editingWeekKey);
+  recomputeAllTime(STATE);
+  saveState(STATE);
+  renderAll();
+  closeWeekEditor();
+  toast('🗑️ Semaine supprimée');
+});
+
+/* -------------------------------------------------------------------------
+   13. Timer : chrono, minuteur, intervalles (avec sons Web Audio)
+   ------------------------------------------------------------------------- */
+let audioCtx = null;
+let soundOn = true;
+function ensureAudio() {
+  if (!audioCtx) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch (e) { audioCtx = null; }
+  }
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}
+function beep(freq, dur, vol) {
+  if (!soundOn) return;
+  ensureAudio();
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol || 0.3, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + (dur || 0.15));
+  osc.connect(g); g.connect(audioCtx.destination);
+  osc.start(t); osc.stop(t + (dur || 0.15) + 0.03);
+}
+function beepCue(type) {
+  if (type === 'count') beep(880, 0.12, 0.25);
+  else if (type === 'work') beep(1250, 0.25, 0.35);
+  else if (type === 'rest') beep(560, 0.25, 0.30);
+  else if (type === 'prep') beep(760, 0.18, 0.25);
+  else if (type === 'done') { beep(1400, 0.2, 0.35); setTimeout(() => beep(1400, 0.2, 0.35), 240); setTimeout(() => beep(1760, 0.45, 0.4), 480); }
+}
+document.getElementById('soundToggle').addEventListener('change', (e) => {
+  soundOn = e.target.checked;
+  if (soundOn) ensureAudio();
+});
+
+/* Sous-onglets timer */
+document.querySelectorAll('#timerSeg .seg-btn').forEach((b) => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('#timerSeg .seg-btn').forEach((x) => x.classList.toggle('active', x === b));
+    const mode = b.dataset.mode;
+    ['chrono', 'minuteur', 'intervalles'].forEach((m) => {
+      document.getElementById('mode-' + m).classList.toggle('hidden', m !== mode);
+    });
+  });
+});
+
+/* Formatage */
+function fmtClock(ms) {
+  ms = Math.max(0, ms);
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+function fmtChrono(ms) {
+  ms = Math.max(0, ms);
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const d = Math.floor((ms % 1000) / 100);
+  const pad = (n) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}.${d}` : `${pad(m)}:${pad(s)}.${d}`;
+}
+
+/* ---- Chrono ---- */
+const chrono = { running: false, startTs: 0, elapsed: 0, raf: null, laps: [] };
+function chronoNow() { return chrono.elapsed + (chrono.running ? performance.now() - chrono.startTs : 0); }
+function chronoRender() { document.getElementById('chronoDisplay').textContent = fmtChrono(chronoNow()); }
+function chronoLoop() { chronoRender(); if (chrono.running) chrono.raf = requestAnimationFrame(chronoLoop); }
+function chronoToggle() {
+  if (chrono.running) {
+    chrono.elapsed = chronoNow(); chrono.running = false; cancelAnimationFrame(chrono.raf);
+    document.getElementById('chronoStart').textContent = 'Reprendre';
+  } else {
+    ensureAudio(); chrono.startTs = performance.now(); chrono.running = true;
+    document.getElementById('chronoStart').textContent = 'Pause';
+    chronoLoop();
+  }
+}
+function chronoReset() {
+  chrono.running = false; cancelAnimationFrame(chrono.raf); chrono.elapsed = 0; chrono.laps = [];
+  document.getElementById('chronoStart').textContent = 'Démarrer';
+  document.getElementById('chronoLaps').innerHTML = '';
+  chronoRender();
+}
+function chronoLap() {
+  if (!chrono.running && chrono.elapsed === 0) return;
+  chrono.laps.unshift(chronoNow());
+  const ol = document.getElementById('chronoLaps'); ol.innerHTML = '';
+  chrono.laps.forEach((lp, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span>Tour ${chrono.laps.length - i}</span><span>${fmtChrono(lp)}</span>`;
+    ol.appendChild(li);
+  });
+}
+document.getElementById('chronoStart').addEventListener('click', chronoToggle);
+document.getElementById('chronoLap').addEventListener('click', chronoLap);
+document.getElementById('chronoReset').addEventListener('click', chronoReset);
+
+/* ---- Minuteur ---- */
+const minuteur = { running: false, endsAt: 0, remaining: 60000, interval: null, lastSec: null };
+function minInputMs() {
+  const m = parseInt(document.getElementById('minMinutes').value) || 0;
+  const s = parseInt(document.getElementById('minSeconds').value) || 0;
+  return (m * 60 + s) * 1000;
+}
+function minRender() { document.getElementById('minuteurDisplay').textContent = fmtClock(minuteur.remaining); }
+function minTick() {
+  minuteur.remaining = minuteur.endsAt - performance.now();
+  if (minuteur.remaining <= 0) {
+    minuteur.remaining = 0; minRender();
+    clearInterval(minuteur.interval); minuteur.running = false;
+    document.getElementById('minStart').textContent = 'Démarrer';
+    beepCue('done');
+    return;
+  }
+  const sec = Math.ceil(minuteur.remaining / 1000);
+  if (sec <= 3 && sec !== minuteur.lastSec) { minuteur.lastSec = sec; beepCue('count'); }
+  minRender();
+}
+function minToggle() {
+  if (minuteur.running) {
+    minuteur.remaining = minuteur.endsAt - performance.now();
+    clearInterval(minuteur.interval); minuteur.running = false;
+    document.getElementById('minStart').textContent = 'Reprendre';
+    return;
+  }
+  ensureAudio();
+  if (minuteur.remaining <= 0) minuteur.remaining = minInputMs();
+  if (minuteur.remaining <= 0) return;
+  minuteur.endsAt = performance.now() + minuteur.remaining;
+  minuteur.lastSec = null; minuteur.running = true;
+  document.getElementById('minStart').textContent = 'Pause';
+  minuteur.interval = setInterval(minTick, 100);
+}
+function minReset() {
+  clearInterval(minuteur.interval); minuteur.running = false;
+  minuteur.remaining = minInputMs(); minuteur.lastSec = null;
+  document.getElementById('minStart').textContent = 'Démarrer';
+  minRender();
+}
+['minMinutes', 'minSeconds'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', () => {
+    if (!minuteur.running) { minuteur.remaining = minInputMs(); minRender(); }
+  });
+});
+document.getElementById('minStart').addEventListener('click', minToggle);
+document.getElementById('minReset').addEventListener('click', minReset);
+(function buildQuickTimers() {
+  const list = [[0, 30], [1, 0], [3, 0], [5, 0], [10, 0]];
+  const host = document.getElementById('quickTimers');
+  list.forEach(([m, s]) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = s ? `${m ? m + 'm' : ''}${s}s` : `${m}m`;
+    b.addEventListener('click', () => {
+      document.getElementById('minMinutes').value = m;
+      document.getElementById('minSeconds').value = s;
+      if (!minuteur.running) { minuteur.remaining = minInputMs(); minRender(); }
+    });
+    host.appendChild(b);
+  });
+})();
+
+/* ---- Intervalles ---- */
+const IV_PRESETS_KEY = 'hyrox-timer-presets-v1';
+let ivPresets = loadPresets();
+const iv = { running: false, phases: [], idx: 0, endsAt: 0, remaining: 0, interval: null, lastSec: null };
+
+function clampInt(id, min) {
+  let v = parseInt(document.getElementById(id).value);
+  if (isNaN(v)) v = min;
+  return Math.max(min, v);
+}
+function ivReadConfig() {
+  return { prep: clampInt('ivPrep', 0), work: clampInt('ivWork', 1), rest: clampInt('ivRest', 0), rounds: clampInt('ivRounds', 1) };
+}
+function ivBuildPhases(cfg) {
+  const ph = [];
+  if (cfg.prep > 0) ph.push({ type: 'prep', dur: cfg.prep, label: 'Préparation' });
+  for (let r = 1; r <= cfg.rounds; r++) {
+    ph.push({ type: 'work', dur: cfg.work, label: 'Effort', round: r });
+    if (cfg.rest > 0 && r < cfg.rounds) ph.push({ type: 'rest', dur: cfg.rest, label: 'Repos', round: r });
+  }
+  return ph;
+}
+function ivSetClass(type) {
+  const disp = document.getElementById('ivDisplay');
+  const name = document.getElementById('ivPhase');
+  ['phase-prep', 'phase-work', 'phase-rest', 'phase-done'].forEach((c) => { disp.classList.remove(c); name.classList.remove(c); });
+  if (type) { disp.classList.add('phase-' + type); name.classList.add('phase-' + type); }
+}
+function ivRender() { document.getElementById('ivDisplay').textContent = fmtClock(iv.remaining); }
+function ivStartPhase() {
+  const p = iv.phases[iv.idx];
+  iv.remaining = p.dur * 1000;
+  iv.endsAt = performance.now() + iv.remaining;
+  iv.lastSec = null;
+  document.getElementById('ivPhase').textContent = p.label;
+  ivSetClass(p.type);
+  const rounds = ivReadConfig().rounds;
+  document.getElementById('ivRound').textContent = p.round ? `Tour ${p.round}/${rounds}` : 'Prépare-toi';
+  beepCue(p.type);
+  ivRender();
+}
+function ivTick() {
+  iv.remaining = iv.endsAt - performance.now();
+  const sec = Math.ceil(iv.remaining / 1000);
+  if (iv.remaining > 0 && sec <= 3 && sec !== iv.lastSec) { iv.lastSec = sec; beepCue('count'); }
+  if (iv.remaining <= 0) {
+    iv.idx++;
+    if (iv.idx >= iv.phases.length) { ivFinish(); return; }
+    ivStartPhase();
+    return;
+  }
+  ivRender();
+}
+function ivToggle() {
+  if (iv.running) { // pause
+    iv.remaining = iv.endsAt - performance.now();
+    clearInterval(iv.interval); iv.running = false;
+    document.getElementById('ivStart').textContent = 'Reprendre';
+    return;
+  }
+  ensureAudio();
+  if (iv.phases.length === 0 || iv.idx >= iv.phases.length) { // départ neuf
+    iv.phases = ivBuildPhases(ivReadConfig()); iv.idx = 0;
+    if (iv.phases.length === 0) return;
+    iv.running = true;
+    document.getElementById('ivStart').textContent = 'Pause';
+    iv.interval = setInterval(ivTick, 100);
+    ivStartPhase();
+    return;
+  }
+  // reprise après pause
+  iv.endsAt = performance.now() + iv.remaining;
+  iv.running = true;
+  document.getElementById('ivStart').textContent = 'Pause';
+  iv.interval = setInterval(ivTick, 100);
+}
+function ivFinish() {
+  clearInterval(iv.interval); iv.running = false; iv.phases = []; iv.idx = 0; iv.remaining = 0;
+  document.getElementById('ivStart').textContent = 'Démarrer';
+  document.getElementById('ivPhase').textContent = 'Terminé 💪';
+  ivSetClass('done');
+  document.getElementById('ivDisplay').textContent = '00:00';
+  document.getElementById('ivRound').textContent = 'Séance finie';
+  beepCue('done');
+}
+function ivStop() {
+  clearInterval(iv.interval); iv.running = false; iv.phases = []; iv.idx = 0; iv.remaining = 0; iv.lastSec = null;
+  document.getElementById('ivStart').textContent = 'Démarrer';
+  document.getElementById('ivPhase').textContent = 'Prêt';
+  ivSetClass(null);
+  document.getElementById('ivDisplay').textContent = '00:00';
+  document.getElementById('ivRound').textContent = '—';
+}
+document.getElementById('ivStart').addEventListener('click', ivToggle);
+document.getElementById('ivStop').addEventListener('click', ivStop);
+
+function loadPresets() {
+  try { const a = JSON.parse(localStorage.getItem(IV_PRESETS_KEY)); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function savePresets() {
+  try { localStorage.setItem(IV_PRESETS_KEY, JSON.stringify(ivPresets)); } catch (e) { /* quota */ }
+}
+function renderPresets() {
+  const host = document.getElementById('presetList');
+  host.innerHTML = '';
+  if (!ivPresets.length) {
+    const p = document.createElement('p'); p.className = 'empty';
+    p.textContent = 'Aucun preset enregistré.';
+    host.appendChild(p); return;
+  }
+  ivPresets.forEach((pr, i) => {
+    const el = document.createElement('div');
+    el.className = 'preset-item';
+    el.innerHTML = `<div><div class="pi-name">${escapeHtml(pr.name)}</div>
+      <div class="pi-detail">Prép ${pr.prep}s · Effort ${pr.work}s · Repos ${pr.rest}s · ${pr.rounds} tours</div></div>
+      <span class="spacer"></span>
+      <button class="pi-load" type="button">Charger</button>
+      <button class="pi-del" type="button" aria-label="Supprimer">✕</button>`;
+    el.querySelector('.pi-load').addEventListener('click', () => {
+      document.getElementById('ivPrep').value = pr.prep;
+      document.getElementById('ivWork').value = pr.work;
+      document.getElementById('ivRest').value = pr.rest;
+      document.getElementById('ivRounds').value = pr.rounds;
+      toast(`⏱️ Preset « ${pr.name} » chargé`);
+    });
+    el.querySelector('.pi-del').addEventListener('click', () => {
+      ivPresets.splice(i, 1); savePresets(); renderPresets();
+    });
+    host.appendChild(el);
+  });
+}
+document.getElementById('ivSavePreset').addEventListener('click', () => {
+  const name = document.getElementById('ivPresetName').value.trim();
+  if (!name) { toast('Donne un nom au preset'); return; }
+  ivPresets.push(Object.assign({ name: name }, ivReadConfig()));
+  savePresets();
+  document.getElementById('ivPresetName').value = '';
+  renderPresets();
+  toast('⏱️ Preset enregistré');
+});
+
+/* Initialisation des affichages timer */
+minReset();
+renderPresets();
+
+/* -------------------------------------------------------------------------
+   14. Démarrage
    ------------------------------------------------------------------------- */
 (function init() {
   const didReset = ensureCurrentWeek(STATE);

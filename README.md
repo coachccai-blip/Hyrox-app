@@ -9,7 +9,11 @@ des semaines passées et met en avant tes **records all-time**.
 - **Saisie hebdomadaire** de ton volume pour 5 catégories : Burpees, Wallballs, Fentes chargées, Course, Gainage.
   Le total de chaque exercice est **éditable** (bouton **Sauvegarder**), avec des ajouts
   rapides (+5 / +10 / …) et un bouton **Remise à zéro** par exercice.
-- **Navigation par barre d'onglets en bas** (inspirée de Sales Quest) : `Semaine · Progression · Succès · Historique`.
+- **Navigation par barre d'onglets en bas** (inspirée de Sales Quest) : `Semaine · Progression · Succès · Timer · Historique`.
+- **Timer** : chronomètre (avec tours), minuteur (compte à rebours) et **entraînement par intervalles**
+  personnalisable (préparation / effort / repos / tours) avec **effets sonores** et **presets enregistrables**.
+- **Historique éditable** : modifie le volume d'une semaine passée, supprime-la, ou **ajoute une semaine
+  oubliée** (choix de la semaine ISO) — les records se recalculent automatiquement.
 - **Compte à rebours en direct** vers le prochain lundi 00:00, au format `Xj HH:MM:SS`.
 - **Story Journal** (bouton en haut à droite) : une galerie mosaïque de tes séances marquantes
   (titre, description, plusieurs photos, lightbox plein écran). **Sans champ prix.**
@@ -43,6 +47,14 @@ des semaines passées et met en avant tes **records all-time**.
 1. Connecte ce dépôt à Netlify (New site from Git).
 2. Laisse le **build command vide** et le **publish directory** sur `.` (déjà configuré dans `netlify.toml`).
 3. Déploie.
+
+## 🌐 Déploiement sur GitHub Pages
+
+Un workflow GitHub Actions (`.github/workflows/pages.yml`) publie automatiquement le site sur
+**GitHub Pages** à chaque push sur la branche. L'URL est de la forme
+`https://<utilisateur>.github.io/<repo>/`. Si Pages n'est pas encore activé, va dans
+**Settings → Pages → Build and deployment → Source : GitHub Actions**, puis relance le workflow
+depuis l'onglet **Actions**.
 
 ## 🗂️ Structure
 
