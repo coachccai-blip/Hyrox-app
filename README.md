@@ -50,11 +50,17 @@ des semaines passées et met en avant tes **records all-time**.
 
 ## 🌐 Déploiement sur GitHub Pages
 
-Un workflow GitHub Actions (`.github/workflows/pages.yml`) publie automatiquement le site sur
-**GitHub Pages** à chaque push sur la branche. L'URL est de la forme
-`https://<utilisateur>.github.io/<repo>/`. Si Pages n'est pas encore activé, va dans
-**Settings → Pages → Build and deployment → Source : GitHub Actions**, puis relance le workflow
-depuis l'onglet **Actions**.
+Le site est 100 % statique et un fichier `.nojekyll` est présent, il se publie donc
+directement depuis la branche. Une seule action à faire une fois dans le dépôt :
+
+1. **Settings → Pages**
+2. **Build and deployment → Source : _Deploy from a branch_**
+3. **Branch : `claude/gamified-exercise-app-1x061w`** — dossier **`/ (root)`** → **Save**
+4. Attends ~1 minute : le site est en ligne sur
+   **`https://coachccai-blip.github.io/Hyrox-app/`**
+
+Toutes les URL (styles, scripts, logo, icônes, manifest) sont relatives : l'app fonctionne
+donc parfaitement sous le sous-chemin `/Hyrox-app/`.
 
 ## 🗂️ Structure
 
