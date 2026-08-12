@@ -359,7 +359,7 @@ input[type="date"].field { color-scheme: dark; }
 
 /* --- Animations timer --- */
 .anim-stage { position: relative; width: 150px; height: 150px; margin: 2px auto 0; }
-.plank-stage { width: 216px; height: 152px; }
+.plank-stage { width: 216px; height: 138px; }
 .anim-stage svg { width: 100%; height: 100%; display: block; overflow: visible; }
 
 /* Chrono : chat dans une roue de hamster */
@@ -370,7 +370,7 @@ input[type="date"].field { color-scheme: dark; }
 .chrono-stage .ground, .plank-stage .ground { stroke: var(--line); stroke-width: 3; stroke-linecap: round; }
 .chrono-stage .wheel { transform-origin: 70px 70px; }
 .chrono-stage.running .wheel { animation: wheelspin 1.05s linear infinite; }
-.cat-run { position: absolute; left: 50%; bottom: 32px; transform: translateX(-50%); font-size: 30px; line-height: 1; }
+.cat-run { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); font-size: 30px; line-height: 1; }
 .chrono-stage.running .cat-run { animation: catbob 0.26s ease-in-out infinite alternate; }
 @keyframes wheelspin { to { transform: rotate(360deg); } }
 @keyframes catbob {
@@ -382,7 +382,7 @@ input[type="date"].field { color-scheme: dark; }
 .plank-stage { display: flex; align-items: flex-end; justify-content: center; }
 .plank-cat { width: 200px; max-width: 100%; display: block; border-radius: 16px; transform-origin: 50% 90%; }
 .plank-stage.running .plank-cat { animation: tremble 0.16s linear infinite; }
-.plank-stage .sweat2 { position: absolute; top: 33%; left: 36%; font-size: 14px; opacity: 0; }
+.plank-stage .sweat2 { position: absolute; top: 36%; left: 36%; font-size: 14px; opacity: 0; }
 .plank-stage.running .sweat2 { animation: drip 1.4s ease-in infinite; }
 @keyframes tremble {
   0% { transform: translateY(0); }
