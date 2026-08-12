@@ -112,6 +112,19 @@
 
         <!-- CHRONO -->
         <div id="mode-chrono" class="timer-mode">
+          <div class="anim-stage chrono-stage" id="chronoAnim" aria-hidden="true">
+            <svg viewBox="0 0 140 150">
+              <g class="wheel">
+                <circle cx="70" cy="70" r="53" class="rim" />
+                <circle cx="70" cy="70" r="43" class="rim" />
+                <circle cx="70" cy="70" r="48" class="rungs" />
+                <circle cx="70" cy="70" r="3.5" class="hub" />
+              </g>
+              <path class="stand" d="M30 134 L70 80 L110 134" />
+              <line class="ground" x1="16" y1="134" x2="124" y2="134" />
+            </svg>
+            <div class="cat-run">🐱</div>
+          </div>
           <div class="timer-display" id="chronoDisplay">00:00.0</div>
           <div class="timer-controls">
             <button class="btn-volt" id="chronoStart" type="button">Démarrer</button>
@@ -123,6 +136,26 @@
 
         <!-- MINUTEUR -->
         <div id="mode-minuteur" class="timer-mode hidden">
+          <div class="anim-stage plank-stage" id="minAnim" aria-hidden="true">
+            <svg viewBox="0 0 190 120">
+              <line class="ground" x1="12" y1="96" x2="178" y2="96" />
+              <ellipse class="shadow" cx="96" cy="101" rx="60" ry="5" />
+              <g class="cat-plank">
+                <path class="cp-stroke" d="M46 64 Q30 60 24 46" />
+                <path class="cp-stroke cp-body" d="M48 66 Q98 52 134 60" />
+                <line class="cp-stroke" x1="56" y1="66" x2="52" y2="94" />
+                <line class="cp-stroke" x1="120" y1="62" x2="122" y2="94" />
+                <path class="cp-stroke" d="M44 94 h20" />
+                <path class="cp-stroke" d="M112 94 h20" />
+                <circle class="cp-stroke cp-head" cx="142" cy="58" r="12" />
+                <path class="cp-ear" d="M133 50 l-2 -9 l8 5 z" />
+                <path class="cp-ear" d="M151 50 l2 -9 l-8 5 z" />
+                <circle class="cp-eye" cx="146" cy="57" r="1.7" />
+                <path class="cp-thin" d="M152 60 h9 M152 63 h8" />
+              </g>
+              <text class="sweat" x="150" y="40">💦</text>
+            </svg>
+          </div>
           <div class="timer-display" id="minuteurDisplay">01:00</div>
           <div class="timer-set">
             <label>Min <input type="number" id="minMinutes" min="0" max="99" value="1" /></label>

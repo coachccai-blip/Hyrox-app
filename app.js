@@ -1123,6 +1123,21 @@ document.getElementById('soundToggle').addEventListener('change', (e) => {
   if (soundOn) ensureAudio();
 });
 
+/* Petit clic sur tous les boutons (UX) */
+function uiClick() {
+  if (!soundOn) return;
+  beep(520, 0.035, 0.10);
+}
+document.addEventListener('click', (e) => {
+  if (e.target.closest('button')) uiClick();
+}, true);
+
+/* Active/désactive une animation de scène */
+function setAnim(id, on) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('running', !!on);
+}
+
 /* Sous-onglets timer */
 document.querySelectorAll('#timerSeg .seg-btn').forEach((b) => {
   b.addEventListener('click', () => {
@@ -1169,11 +1184,13 @@ function chronoToggle() {
     document.getElementById('chronoStart').textContent = 'Pause';
     chronoLoop();
   }
+  setAnim('chronoAnim', chrono.running);
 }
 function chronoReset() {
   chrono.running = false; cancelAnimationFrame(chrono.raf); chrono.elapsed = 0; chrono.laps = [];
   document.getElementById('chronoStart').textContent = 'Démarrer';
   document.getElementById('chronoLaps').innerHTML = '';
+  setAnim('chronoAnim', false);
   chronoRender();
 }
 function chronoLap() {
@@ -1204,6 +1221,7 @@ function minTick() {
     minuteur.remaining = 0; minRender();
     clearInterval(minuteur.interval); minuteur.running = false;
     document.getElementById('minStart').textContent = 'Démarrer';
+    setAnim('minAnim', false);
     beepCue('done');
     return;
   }
@@ -1216,6 +1234,7 @@ function minToggle() {
     minuteur.remaining = minuteur.endsAt - performance.now();
     clearInterval(minuteur.interval); minuteur.running = false;
     document.getElementById('minStart').textContent = 'Reprendre';
+    setAnim('minAnim', false);
     return;
   }
   ensureAudio();
@@ -1225,11 +1244,13 @@ function minToggle() {
   minuteur.lastSec = null; minuteur.running = true;
   document.getElementById('minStart').textContent = 'Pause';
   minuteur.interval = setInterval(minTick, 100);
+  setAnim('minAnim', true);
 }
 function minReset() {
   clearInterval(minuteur.interval); minuteur.running = false;
   minuteur.remaining = minInputMs(); minuteur.lastSec = null;
   document.getElementById('minStart').textContent = 'Démarrer';
+  setAnim('minAnim', false);
   minRender();
 }
 ['minMinutes', 'minSeconds'].forEach((id) => {

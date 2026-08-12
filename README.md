@@ -12,7 +12,9 @@ des semaines passées et met en avant tes **records all-time**.
 - **Navigation par barre d'onglets en bas** (inspirée de Sales Quest) : `Semaine · Progression · Succès · Timer · Historique`.
 - **Timer** : chronomètre (avec tours), minuteur (compte à rebours, **presets enregistrables**) et
   **entraînement par intervalles** personnalisable (préparation / effort / repos / tours) avec
-  **effets sonores** et **presets enregistrables**.
+  **effets sonores** et **presets enregistrables**. Animations dédiées : un **chat qui court dans une
+  roue de hamster** pour le chrono, un **chat en gainage** (qui tremble et transpire) pour le minuteur.
+- **Bruitages d'interface** : un petit clic sonore sur chaque bouton (désactivable via 🔊 dans l'onglet Timer).
 - **Historique éditable** : modifie le volume d'une semaine passée, supprime-la, ou **ajoute une semaine
   oubliée** (choix de la semaine ISO) — les records se recalculent automatiquement.
 - **Compte à rebours en direct** vers le prochain lundi 00:00, au format `Xj HH:MM:SS`.
