@@ -120,12 +120,23 @@
         <div id="planSummary" class="plan-summary"></div>
       </div>
 
-      <div id="planVariants" class="plan-variants"></div>
       <div id="planCards" class="plan-cards"></div>
       <div id="planTotals" class="plan-totals hidden"></div>
       <div id="planAdoptBar" class="plan-adopt hidden">
-        <p class="muted">Tu peux modifier les valeurs et le type de séance ci-dessus avant d'adopter ce plan.</p>
+        <p class="muted">Tu peux modifier le jour, le moment, le type de séance et les valeurs avant d'adopter ce plan.</p>
         <button id="planAdopt" class="btn-volt" type="button">✓ Adopter ce plan</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Mes plans enregistrés</h2>
+          <p class="muted">Enregistre un plan une fois ajusté pour le recharger les semaines suivantes.</p>
+        </div>
+        <div class="cfg-save">
+          <input type="text" id="planSaveName" maxlength="40" placeholder="Nom du plan (ex. Bloc hiver)" />
+          <button class="btn-volt" id="planSave" type="button">Enregistrer</button>
+        </div>
+        <div id="planLibrary" class="preset-list"></div>
       </div>
     </section>
 

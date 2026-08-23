@@ -1593,25 +1593,20 @@ const CHARGE = {
   'Sortie longue': 7, 'Fractionné': 9, 'Tempo': 7, 'Footing récup': 3, 'Course': 6,
 };
 
-/* 4 organisations de semaine. Même charge d'entraînement, 4 façons de la poser. */
-const PLAN_VARIANTS = [
-  { id: 'equilibre', name: 'Équilibré', icon: '⚖️',
-    desc: 'Séances étalées sur la semaine, jamais deux jours durs collés. Le meilleur compromis récupération / régularité.',
-    days: { 1: [2], 2: [1, 4], 3: [0, 2, 4], 4: [0, 2, 4, 6], 5: [0, 1, 3, 4, 6], 6: [0, 1, 2, 4, 5, 6], 7: [0, 1, 2, 3, 4, 5, 6] },
-    moment: (d, slot, charge) => (slot === 1 ? 'Soir' : (charge >= 8 ? 'Matin' : 'Soir')) },
-  { id: 'weekend', name: 'Week-end chargé', icon: '📅',
-    desc: 'Le gros du volume le samedi et le dimanche, semaine allégée en soirée. Idéal si tes journées sont prises.',
-    days: { 1: [5], 2: [5, 6], 3: [2, 5, 6], 4: [1, 3, 5, 6], 5: [1, 2, 3, 5, 6], 6: [0, 1, 2, 3, 5, 6], 7: [0, 1, 2, 3, 4, 5, 6] },
-    moment: (d, slot) => (slot === 1 ? 'Soir' : (d >= 5 ? 'Matin' : 'Soir')) },
-  { id: 'matinal', name: 'Matinal', icon: '🌅',
-    desc: 'Tout se fait le matin, soirées libres. Demande de se coucher tôt mais garantit que la séance est faite.',
-    days: { 1: [2], 2: [1, 4], 3: [0, 2, 4], 4: [0, 2, 4, 6], 5: [0, 1, 3, 4, 6], 6: [0, 1, 2, 4, 5, 6], 7: [0, 1, 2, 3, 4, 5, 6] },
-    moment: () => 'Matin' },
-  { id: 'double', name: 'Doubles séances', icon: '⚡',
-    desc: 'Deux séances le même jour (matin + soir) pour libérer davantage de jours de repos complets.',
-    days: null, // calculé : 2 séances par jour
-    moment: (d, slot) => (slot === 0 ? 'Matin' : 'Soir') },
-];
+/* Moments de la journée (modifiables sur chaque carte). */
+const PARTS = ['Matin', 'Midi', 'Soir'];
+const PART_EMOJI = { 'Matin': '🌅', 'Midi': '☀️', 'Soir': '🌙' };
+function partIndex(p) { const i = PARTS.indexOf(p); return i === -1 ? 0 : i; }
+function sortSessions(list) {
+  return list.sort((a, b) => (a.day - b.day) || (partIndex(a.part) - partIndex(b.part)));
+}
+
+/* Organisation par défaut : deux séances le même jour (matin + soir) pour
+   libérer un maximum de jours de repos complets. Tout reste modifiable. */
+const PLAN_LAYOUT = {
+  id: 'double', name: 'Doubles séances', icon: '⚡',
+  moment: (d, slot) => (slot === 0 ? 'Matin' : 'Soir'),
+};
 
 function planExercise(id) { return EXERCISES.find((e) => e.id === id); }
 function loadPlan() { try { return JSON.parse(localStorage.getItem(PLAN_KEY)) || {}; } catch (e) { return {}; } }
@@ -1631,21 +1626,14 @@ function loadWeekPlan() {
 }
 function saveWeekPlan(p) { try { localStorage.setItem(WEEK_PLAN_KEY, JSON.stringify(p)); } catch (e) {} }
 
-/** Créneaux (jour + rang dans la journée) pour n séances selon la variante. */
-function slotsFor(variant, n) {
+/** Créneaux (jour + rang dans la journée) pour n séances : 2 par jour. */
+function slotsFor(n) {
   if (n <= 0) return [];
-  if (variant.id === 'double') {
-    const base = [0, 2, 4, 6, 1, 3, 5];
-    const nDays = Math.ceil(n / 2);
-    const days = base.slice(0, nDays).sort((a, b) => a - b);
-    const out = [];
-    for (let k = 0; k < n; k++) out.push({ day: days[Math.floor(k / 2)], slot: k % 2 });
-    return out;
-  }
-  if (n <= 7) return (variant.days[n] || [0, 1, 2, 3, 4, 5, 6]).map((d) => ({ day: d, slot: 0 }));
-  const out = [0, 1, 2, 3, 4, 5, 6].map((d) => ({ day: d, slot: 0 }));
-  for (let k = 7; k < n && k - 7 < 7; k++) out.push({ day: k - 7, slot: 1 });
-  return out.sort((a, b) => (a.day - b.day) || (a.slot - b.slot));
+  const base = [0, 2, 4, 6, 1, 3, 5];
+  const days = base.slice(0, Math.ceil(n / 2)).sort((a, b) => a - b);
+  const out = [];
+  for (let k = 0; k < n; k++) out.push({ day: days[Math.floor(k / 2)], slot: k % 2 });
+  return out;
 }
 
 /** Alterne muscu / course pour éviter deux séances du même type d'affilée. */
@@ -1685,8 +1673,8 @@ function schedulePenalty(order, slots) {
 }
 
 /** Place les séances sur la semaine et optimise l'enchaînement par échanges. */
-function schedulePlan(sessions, variant) {
-  const slots = slotsFor(variant, sessions.length);
+function schedulePlan(sessions) {
+  const slots = slotsFor(sessions.length);
   let best = interleaveByKind(sessions);
   let bestP = schedulePenalty(best, slots);
   for (let pass = 0; pass < 40 && bestP > 0; pass++) {
@@ -1703,7 +1691,7 @@ function schedulePlan(sessions, variant) {
   }
   return best.map((s, i) => Object.assign({}, s, {
     day: slots[i].day,
-    part: variant.moment(slots[i].day, slots[i].slot, s.charge),
+    part: PLAN_LAYOUT.moment(slots[i].day, slots[i].slot, s.charge),
   }));
 }
 
@@ -1727,23 +1715,10 @@ function generatePlan() {
   EXERCISES.forEach((ex) => { weekly[ex.id] = ex.tiers[target]; });
 
   // Récapitulatif de l'objectif
-  const goals = EXERCISES.map((ex) => {
-    const v = ex.id === 'gainage' ? fmtSeconds(weekly[ex.id]) : `${fmt(ex, weekly[ex.id])} ${ex.unit}`;
-    return `<span class="ps-goal"><span class="g-em">${ex.emoji}</span>${ex.name} : ${v}</span>`;
-  }).join('');
   let note = '';
   if (nM === 0) note += 'Ajoute au moins 1 séance muscu pour répartir burpees, wallballs, fentes et gainage. ';
   if (nC === 0 && weekly.course > 0) note += 'Ajoute au moins 1 séance course pour la distance visée.';
-  const method = equal
-    ? 'Répartition égale : chaque séance est identique. Simple, mais moins efficace pour progresser.'
-    : 'Répartition intelligente : chaque séance a une dominante (puissance, jambes, spécifique) et la course est polarisée — une sortie longue facile, un fractionné court et intense, un tempo. Le total de la semaine reste exactement celui de ton objectif.';
-  document.getElementById('planSummary').innerHTML = `
-    <div class="ps-card">
-      <div class="ps-title">Objectif : <strong>${LEVELS[target].name}</strong> — volume hebdo à viser</div>
-      <div class="ps-goals">${goals}</div>
-      <div class="ps-method">${method}</div>
-      ${note ? `<div class="ps-note">⚠️ ${note}</div>` : ''}
-    </div>`;
+  renderPlanSummary(target, equal, note);
 
   // --- Construction des séances (contenu identique dans les 4 variantes) ---
   const sessions = [];
@@ -1789,55 +1764,48 @@ function generatePlan() {
     });
   });
 
-  // --- 4 organisations de semaine ---
   PLAN_STATE = {
     target: target,
     weekly: weekly,
-    variants: PLAN_VARIANTS.map((v) => ({
-      id: v.id, name: v.name, icon: v.icon, desc: v.desc,
-      sessions: schedulePlan(sessions.map((s) => JSON.parse(JSON.stringify(s))), v)
-        .sort((a, b) => (a.day - b.day) || (a.part === 'Matin' ? -1 : 1)),
-    })),
-    selected: 0,
+    sessions: sortSessions(schedulePlan(sessions)),
   };
-  renderPlanVariants();
-  selectPlanVariant(0);
+  renderPlanCards();
 }
 
-/* ---- Sélecteur de variante ---- */
 let PLAN_STATE = null;
 
+/** Encart d'objectif : volume hebdo visé + méthode de répartition. */
+function renderPlanSummary(target, equal, note) {
+  const goals = EXERCISES.map((ex) => {
+    const goal = ex.tiers[target];
+    const v = ex.id === 'gainage' ? fmtSeconds(goal) : `${fmt(ex, goal)} ${ex.unit}`;
+    return `<span class="ps-goal"><span class="g-em">${ex.emoji}</span>${ex.name} : ${v}</span>`;
+  }).join('');
+  const method = equal
+    ? 'Répartition égale : chaque séance est identique. Simple, mais moins efficace pour progresser.'
+    : 'Répartition intelligente : chaque séance a une dominante (puissance, jambes, spécifique) et la course est polarisée — une sortie longue facile, un fractionné court et intense, un tempo. Jour, moment et valeurs restent modifiables.';
+  document.getElementById('planSummary').innerHTML = `
+    <div class="ps-card">
+      <div class="ps-title">Objectif : <strong>${LEVELS[target].name}</strong> — volume hebdo à viser</div>
+      <div class="ps-goals">${goals}</div>
+      <div class="ps-method">${method}</div>
+      ${note ? `<div class="ps-note">⚠️ ${note}</div>` : ''}
+    </div>`;
+}
+
 function daySummary(sessions) {
-  const byDay = {};
-  sessions.forEach((s) => { (byDay[s.day] = byDay[s.day] || []).push(s); });
-  const days = Object.keys(byDay).map(Number).sort((a, b) => a - b);
+  const days = [];
+  sessions.forEach((s) => { if (days.indexOf(s.day) === -1) days.push(s.day); });
+  days.sort((a, b) => a - b);
   const rest = 7 - days.length;
   return `${days.map((d) => DAYS[d].slice(0, 3)).join(' · ')} — ${rest} jour${rest > 1 ? 's' : ''} de repos`;
 }
 
-function renderPlanVariants() {
-  const host = document.getElementById('planVariants');
-  host.innerHTML = '';
+/** Affiche les cartes du plan : jour, moment, valeurs et type tous éditables. */
+function renderPlanCards() {
   if (!PLAN_STATE) return;
-  PLAN_STATE.variants.forEach((v, i) => {
-    const el = document.createElement('button');
-    el.type = 'button';
-    el.className = 'variant-pill' + (i === PLAN_STATE.selected ? ' active' : '');
-    el.innerHTML = `
-      <div class="vp-head"><span class="vp-icon">${v.icon}</span><span class="vp-name">${v.name}</span></div>
-      <div class="vp-days">${daySummary(v.sessions)}</div>
-      <div class="vp-desc">${v.desc}</div>`;
-    el.addEventListener('click', () => selectPlanVariant(i));
-    host.appendChild(el);
-  });
-}
-
-/** Affiche les cartes de la variante choisie, avec valeurs éditables. */
-function selectPlanVariant(idx) {
-  if (!PLAN_STATE) return;
-  PLAN_STATE.selected = idx;
-  renderPlanVariants();
-  const v = PLAN_STATE.variants[idx];
+  const v = PLAN_STATE;
+  sortSessions(v.sessions);
   const host = document.getElementById('planCards');
   host.innerHTML = '';
 
@@ -1866,7 +1834,14 @@ function selectPlanVariant(idx) {
     const card = document.createElement('div');
     card.className = 'plan-card ' + s.kind;
     card.innerHTML = `
-      <div class="pc-day"><span class="pc-dayname">${DAYS[s.day]}</span><span class="pc-part">${s.part === 'Matin' ? '🌅 Matin' : '🌙 Soir'}</span></div>
+      <div class="pc-when">
+        <select class="pc-daysel" data-s="${si}" aria-label="Jour">
+          ${DAYS.map((d, di) => `<option value="${di}"${di === s.day ? ' selected' : ''}>${d}</option>`).join('')}
+        </select>
+        <select class="pc-partsel" data-s="${si}" aria-label="Moment">
+          ${PARTS.map((p) => `<option value="${p}"${p === s.part ? ' selected' : ''}>${PART_EMOJI[p]} ${p}</option>`).join('')}
+        </select>
+      </div>
       <div class="pc-head">
         <div class="pc-emoji">${s.emoji}</div>
         <div><div class="pc-kind">${s.kind === 'muscu' ? 'Muscu' : 'Course'}</div>
@@ -1894,6 +1869,17 @@ function selectPlanVariant(idx) {
       });
     });
 
+    const daySel = card.querySelector('.pc-daysel');
+    daySel.addEventListener('change', () => {
+      v.sessions[+daySel.dataset.s].day = parseInt(daySel.value, 10);
+      renderPlanCards();
+    });
+    const partSel = card.querySelector('.pc-partsel');
+    partSel.addEventListener('change', () => {
+      v.sessions[+partSel.dataset.s].part = partSel.value;
+      renderPlanCards();
+    });
+
     const sel = card.querySelector('.pc-type select');
     if (sel) {
       sel.addEventListener('change', () => {
@@ -1909,7 +1895,7 @@ function selectPlanVariant(idx) {
           sess.items[0].value = sess.cap;
           toast(`⚠️ Distance ramenée à ${sess.cap} km (plafond fractionné)`);
         }
-        selectPlanVariant(PLAN_STATE.selected);
+        renderPlanCards();
       });
     }
 
@@ -1924,7 +1910,7 @@ function selectPlanVariant(idx) {
 function renderPlanTotals() {
   const host = document.getElementById('planTotals');
   if (!PLAN_STATE) { host.classList.add('hidden'); return; }
-  const v = PLAN_STATE.variants[PLAN_STATE.selected];
+  const v = PLAN_STATE;
   if (!v || !v.sessions.length) { host.classList.add('hidden'); return; }
 
   const totals = {};
@@ -1961,15 +1947,88 @@ function renderPlanTotals() {
 /* ---- Adoption du plan → agenda ---- */
 document.getElementById('planAdopt').addEventListener('click', () => {
   if (!PLAN_STATE) return;
-  const v = PLAN_STATE.variants[PLAN_STATE.selected];
+  const v = PLAN_STATE;
   saveWeekPlan({
     week: STATE.currentWeek,
-    variantId: v.id, variantName: v.name, icon: v.icon,
+    variantId: PLAN_LAYOUT.id,
+    variantName: v.name || ('Objectif ' + LEVELS[v.target].name),
+    icon: PLAN_LAYOUT.icon,
     sessions: JSON.parse(JSON.stringify(v.sessions)),
   });
   renderCalendar();
   toast('📅 Plan adopté — retrouve-le dans l’agenda');
   toggleCalendar(true);
+});
+
+/* ---- Bibliothèque de plans enregistrés ---- */
+const PLAN_LIB_KEY = 'hyrox-plan-library-v1';
+function loadLibrary() {
+  try { const a = JSON.parse(localStorage.getItem(PLAN_LIB_KEY)); return Array.isArray(a) ? a : []; }
+  catch (e) { return []; }
+}
+function saveLibrary(lib) {
+  try { localStorage.setItem(PLAN_LIB_KEY, JSON.stringify(lib)); return true; } catch (e) { return false; }
+}
+
+function renderLibrary() {
+  const host = document.getElementById('planLibrary');
+  const lib = loadLibrary();
+  host.innerHTML = '';
+  if (!lib.length) {
+    host.innerHTML = '<p class="empty">Aucun plan enregistré. Génère un plan, ajuste-le, puis enregistre-le pour le recharger les semaines suivantes.</p>';
+    return;
+  }
+  lib.forEach((p, i) => {
+    const el = document.createElement('div');
+    el.className = 'preset-item';
+    el.innerHTML = `<div><div class="pi-name">${escapeHtml(p.name)}</div>
+      <div class="pi-detail">Objectif ${LEVELS[p.target] ? LEVELS[p.target].name : '?'} · ${p.sessions.length} séance${p.sessions.length > 1 ? 's' : ''} · ${daySummary(p.sessions)}</div></div>
+      <span class="spacer"></span>
+      <button class="pi-load" type="button">Charger</button>
+      <button class="pi-del" type="button" aria-label="Supprimer">✕</button>`;
+    el.querySelector('.pi-load').addEventListener('click', () => {
+      const weekly = {};
+      EXERCISES.forEach((ex) => { weekly[ex.id] = ex.tiers[p.target]; });
+      PLAN_STATE = {
+        target: p.target, weekly: weekly, name: p.name,
+        sessions: JSON.parse(JSON.stringify(p.sessions)),
+      };
+      document.getElementById('planTarget').value = p.target;
+      renderPlanSummary(p.target, false);
+      renderPlanCards();
+      document.getElementById('planCards').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      toast(`📋 Plan « ${p.name} » chargé`);
+    });
+    el.querySelector('.pi-del').addEventListener('click', () => {
+      if (!confirm(`Supprimer le plan « ${p.name} » ?`)) return;
+      const cur = loadLibrary(); cur.splice(i, 1); saveLibrary(cur); renderLibrary();
+    });
+    host.appendChild(el);
+  });
+}
+
+document.getElementById('planSave').addEventListener('click', () => {
+  if (!PLAN_STATE || !PLAN_STATE.sessions.length) { toast('Génère d’abord un plan'); return; }
+  const input = document.getElementById('planSaveName');
+  const name = input.value.trim();
+  if (!name) { toast('Donne un nom à ton plan'); return; }
+  const lib = loadLibrary();
+  const entry = {
+    name: name, target: PLAN_STATE.target,
+    sessions: JSON.parse(JSON.stringify(PLAN_STATE.sessions)),
+  };
+  const existing = lib.findIndex((p) => p.name === name);
+  if (existing >= 0) {
+    if (!confirm(`Un plan « ${name} » existe déjà. Le remplacer ?`)) return;
+    lib[existing] = entry;
+  } else {
+    lib.push(entry);
+  }
+  if (!saveLibrary(lib)) { toast('⚠️ Stockage plein'); return; }
+  PLAN_STATE.name = name;
+  input.value = '';
+  renderLibrary();
+  toast('💾 Plan enregistré');
 });
 
 /* ---- Agenda ---- */
@@ -2006,7 +2065,7 @@ function renderCalendar() {
       inner += daySessions.map((s) => `
         <div class="cal-session ${s.kind}">
           <div class="cs-top">
-            <span class="cs-part">${s.part === 'Matin' ? '🌅 Matin' : '🌙 Soir'}</span>
+            <span class="cs-part">${(PART_EMOJI[s.part] || '🌙')} ${escapeHtml(s.part || 'Soir')}</span>
             <span class="cs-name">${s.emoji} ${escapeHtml(s.name)}</span>
             <span class="cs-rpe">${escapeHtml(s.rpe)}</span>
           </div>
@@ -2052,6 +2111,7 @@ function initPlanUI() {
   document.getElementById('planCourse').value = saved.course != null ? saved.course : 2;
   document.getElementById('planEqual').checked = !!saved.equal;
   document.getElementById('planGenerate').addEventListener('click', generatePlan);
+  renderLibrary();
   if (saved.generated) generatePlan();
 }
 initPlanUI();

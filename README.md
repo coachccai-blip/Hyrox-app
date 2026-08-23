@@ -17,15 +17,16 @@ des semaines passées et met en avant tes **records all-time**.
   roue de hamster** pour le chrono, un **chat en gainage** (qui tremble et transpire) pour le minuteur.
 - **Bruitages d'interface** : un petit clic sonore sur chaque bouton (désactivable via 🔊 dans l'onglet Timer).
 - **Plan d'entraînement** : choisis ton **objectif** (palier visé), ton nombre de **séances muscu** et de
-  **séances course** par semaine → l'app génère **4 organisations de semaine** au choix
-  (Équilibré · Week-end chargé · Matinal · Doubles séances). Chaque séance est posée sur un **jour précis**
-  avec **matin ou soir**, et l'ordre est optimisé pour la récupération : jamais deux séances dures collées,
-  alternance muscu/course, et enchaînement dimanche → lundi valide pour répéter la semaine.
+  **séances course** par semaine → l'app pose les séances en **doubles séances** (matin + soir le même jour)
+  pour libérer un maximum de jours de repos. L'ordre est optimisé pour la récupération : jamais deux séances
+  dures collées, alternance muscu/course, et enchaînement dimanche → lundi valide pour répéter la semaine.
+  **Jour** et **moment (matin / midi / soir)** se changent sur chaque carte.
   Les **valeurs sont modifiables** avant d'adopter le plan, le **type de séance de course**
   se change à la volée (sortie longue / tempo / fractionné / footing), et un **récapitulatif des totaux**
   compare en direct ce qui est programmé à l'objectif visé.
   Le **fractionné est plafonné à 4 km** par séance (prévention des blessures) : le surplus de
   kilométrage est automatiquement redistribué sur les autres sorties.
+- **Plans enregistrés** : sauvegarde un plan une fois ajusté et recharge-le en un clic les semaines suivantes.
 - **Agenda** (bouton en haut à droite) : le plan adopté s'y affiche jour par jour (avec le jour du jour mis
   en avant), et un bouton permet de **vider le plan de la semaine** pour en choisir un autre.
 - **Mise à jour automatique** : un service worker sert toujours la dernière version en ligne, recharge
@@ -105,6 +106,7 @@ typographie athlétique en capitales italiques, icônes ligne. Les 7 couleurs de
 - `hyrox-timer-presets-v1` / `hyrox-timer-min-presets-v1` — presets d'intervalles et de minuteur.
 - `hyrox-plan-v1` — réglages du plan (objectif + nombre de séances).
 - `hyrox-week-plan-v1` — plan adopté pour la semaine (agenda).
+- `hyrox-plan-library-v1` — bibliothèque de plans enregistrés.
 
 ## 🖼️ Logo & icône d'application
 
