@@ -1513,16 +1513,57 @@ const MUSCU_SESSIONS = [
     tip: 'Rythme régulier, récup courte (30–45 s). Objectif : tenir le volume proprement.' },
 ];
 
+/* Volume max de fractionné par séance (km) : au-delà, le risque de blessure
+   grimpe nettement pour un gain marginal. Le surplus part sur les autres sorties. */
+const FRACTIONNE_MAX_KM = 4;
+
 const COURSE_SESSIONS = [
   { name: 'Sortie longue', rpe: 'RPE 5–6 · facile', w: 1.6,
     tip: 'Allure facile : tu dois pouvoir parler en courant. C’est le socle de ton endurance.' },
-  { name: 'Fractionné', rpe: 'RPE 9 · intense', w: 0.65,
-    tip: 'Ex. 8×400 m rapides, 1 min de récup. Court en volume, mais c’est là que la vitesse se gagne.' },
+  { name: 'Fractionné', rpe: 'RPE 9 · intense', w: 0.65, cap: FRACTIONNE_MAX_KM,
+    tip: `Ex. 8×400 m rapides, 1 min de récup. Plafonné à ${FRACTIONNE_MAX_KM} km de qualité pour éviter la blessure.` },
   { name: 'Tempo', rpe: 'RPE 7–8 · soutenu', w: 1.0,
     tip: 'Allure soutenue et tenue, proche de ton rythme de course visé en compétition.' },
   { name: 'Footing récup', rpe: 'RPE 4–5 · récup', w: 0.8,
     tip: 'Très facile, jambes légères. Cette séance sert à récupérer, pas à performer.' },
 ];
+
+/**
+ * Répartit le kilométrage entre les sorties en respectant les plafonds
+ * (ex. fractionné ≤ 4 km) : le surplus est redistribué sur les sorties
+ * non plafonnées, proportionnellement à leur poids.
+ */
+function distributeCourse(total, profiles) {
+  const n = profiles.length;
+  if (!n) return [];
+  const alloc = new Array(n).fill(0);
+  const locked = new Array(n).fill(false);
+  for (let pass = 0; pass <= n; pass++) {
+    let wSum = 0, lockedSum = 0;
+    for (let i = 0; i < n; i++) {
+      if (locked[i]) lockedSum += alloc[i]; else wSum += profiles[i].w;
+    }
+    if (wSum <= 0) break;
+    const rest = Math.max(0, total - lockedSum);
+    let changed = false;
+    for (let i = 0; i < n; i++) {
+      if (locked[i]) continue;
+      alloc[i] = rest * profiles[i].w / wSum;
+      const cap = profiles[i].cap;
+      if (cap != null && alloc[i] > cap) { alloc[i] = cap; locked[i] = true; changed = true; }
+    }
+    if (!changed) break;
+  }
+  const out = alloc.map((v) => Math.round(v * 10) / 10);
+  // La dernière sortie non plafonnée absorbe l'arrondi pour tomber juste.
+  let lastOpen = -1;
+  for (let i = n - 1; i >= 0; i--) if (!locked[i]) { lastOpen = i; break; }
+  if (lastOpen >= 0) {
+    const others = out.reduce((s, v, i) => s + (i === lastOpen ? 0 : v), 0);
+    out[lastOpen] = Math.max(0, Math.round((total - others) * 10) / 10);
+  }
+  return out;
+}
 
 /**
  * Répartit un volume total selon des poids, en garantissant que la somme
@@ -1738,11 +1779,11 @@ function generatePlan() {
           tip: 'Allure régulière. Distance identique à chaque séance.' }
       : COURSE_SESSIONS[s % COURSE_SESSIONS.length]);
   }
-  const cSplit = distribute(weekly.course, cProfiles.map((p) => p.w), true);
+  const cSplit = distributeCourse(weekly.course, cProfiles);
   cProfiles.forEach((p, s) => {
     sessions.push({
       kind: 'course', name: p.name, emoji: '🏃', rpe: p.rpe, tip: p.tip,
-      charge: CHARGE[p.name] || 6,
+      charge: CHARGE[p.name] || 6, cap: p.cap != null ? p.cap : null,
       items: [{ id: 'course', label: 'Distance', emoji: '🐆', unit: 'km',
                 value: cSplit[s], isTime: false, decimals: true }],
     });
@@ -1751,6 +1792,7 @@ function generatePlan() {
   // --- 4 organisations de semaine ---
   PLAN_STATE = {
     target: target,
+    weekly: weekly,
     variants: PLAN_VARIANTS.map((v) => ({
       id: v.id, name: v.name, icon: v.icon, desc: v.desc,
       sessions: schedulePlan(sessions.map((s) => JSON.parse(JSON.stringify(s))), v)
@@ -1809,6 +1851,18 @@ function selectPlanVariant(idx) {
           <span class="pc-unit">${it.isTime ? 's' : it.unit}</span>
         </span>
       </li>`).join('');
+    // Sélecteur de type pour les séances de course
+    let typeSel = '';
+    if (s.kind === 'course') {
+      const names = COURSE_SESSIONS.map((c) => c.name);
+      const opts = (names.indexOf(s.name) === -1 ? [s.name] : []).concat(names);
+      typeSel = `<div class="pc-type">
+        <label>Type de séance</label>
+        <select data-s="${si}">${opts.map((n) =>
+          `<option value="${escapeHtml(n)}"${n === s.name ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('')}</select>
+      </div>`;
+    }
+
     const card = document.createElement('div');
     card.className = 'plan-card ' + s.kind;
     card.innerHTML = `
@@ -1816,24 +1870,92 @@ function selectPlanVariant(idx) {
       <div class="pc-head">
         <div class="pc-emoji">${s.emoji}</div>
         <div><div class="pc-kind">${s.kind === 'muscu' ? 'Muscu' : 'Course'}</div>
-          <div class="pc-title">${s.name}<span class="pc-sub">${s.rpe}</span></div></div>
+          <div class="pc-title">${escapeHtml(s.name)}<span class="pc-sub">${s.rpe}</span></div></div>
       </div>
+      ${typeSel}
       <ul class="pc-list">${items}</ul>
       <div class="pc-tip">${s.tip}</div>`;
-    card.querySelectorAll('input').forEach((inp) => {
+
+    card.querySelectorAll('.pc-edit input').forEach((inp) => {
       inp.addEventListener('focus', () => inp.select());
       inp.addEventListener('change', () => {
+        const sess = v.sessions[+inp.dataset.s];
+        const it = sess.items[+inp.dataset.i];
         let val = parseFloat(inp.value);
         if (isNaN(val) || val < 0) val = 0;
-        const it = v.sessions[+inp.dataset.s].items[+inp.dataset.i];
-        it.value = it.decimals ? Math.round(val * 10) / 10 : Math.round(val);
-        inp.value = it.value;
+        val = it.decimals ? Math.round(val * 10) / 10 : Math.round(val);
+        if (sess.kind === 'course' && sess.cap != null && val > sess.cap) {
+          val = sess.cap;
+          toast(`⚠️ Fractionné plafonné à ${sess.cap} km pour éviter la blessure`);
+        }
+        it.value = val;
+        inp.value = val;
+        renderPlanTotals();
       });
     });
+
+    const sel = card.querySelector('.pc-type select');
+    if (sel) {
+      sel.addEventListener('change', () => {
+        const sess = v.sessions[+sel.dataset.s];
+        const prof = COURSE_SESSIONS.find((c) => c.name === sel.value);
+        if (!prof) return;
+        sess.name = prof.name;
+        sess.rpe = prof.rpe;
+        sess.tip = prof.tip;
+        sess.charge = CHARGE[prof.name] || 6;
+        sess.cap = prof.cap != null ? prof.cap : null;
+        if (sess.cap != null && sess.items[0].value > sess.cap) {
+          sess.items[0].value = sess.cap;
+          toast(`⚠️ Distance ramenée à ${sess.cap} km (plafond fractionné)`);
+        }
+        selectPlanVariant(PLAN_STATE.selected);
+      });
+    }
+
     host.appendChild(card);
   });
 
   document.getElementById('planAdoptBar').classList.toggle('hidden', v.sessions.length === 0);
+  renderPlanTotals();
+}
+
+/** Récapitulatif des totaux réellement programmés vs objectif. */
+function renderPlanTotals() {
+  const host = document.getElementById('planTotals');
+  if (!PLAN_STATE) { host.classList.add('hidden'); return; }
+  const v = PLAN_STATE.variants[PLAN_STATE.selected];
+  if (!v || !v.sessions.length) { host.classList.add('hidden'); return; }
+
+  const totals = {};
+  EXERCISES.forEach((ex) => { totals[ex.id] = 0; });
+  v.sessions.forEach((s) => s.items.forEach((it) => {
+    totals[it.id] = (totals[it.id] || 0) + (it.value || 0);
+  }));
+
+  let short = 0;
+  const rows = EXERCISES.map((ex) => {
+    const got = ex.decimals ? Math.round(totals[ex.id] * 10) / 10 : Math.round(totals[ex.id]);
+    const goal = PLAN_STATE.weekly[ex.id];
+    const ok = got >= goal;
+    if (!ok) short++;
+    const f = (x) => (ex.id === 'gainage' ? fmtSeconds(x) : `${fmt(ex, x)} ${ex.unit}`);
+    const diff = ok ? '' : ` <span class="pt-diff">−${f(Math.round((goal - got) * 10) / 10)}</span>`;
+    return `<div class="pt-row ${ok ? 'ok' : 'under'}">
+      <span class="pt-ex">${ex.emoji} ${ex.name}</span>
+      <span class="pt-val">${f(got)} <span class="pt-goal">/ ${f(goal)}</span> ${ok ? '✓' : ''}${diff}</span>
+    </div>`;
+  }).join('');
+
+  host.classList.remove('hidden');
+  host.innerHTML = `
+    <div class="pt-card">
+      <div class="pt-title">Total programmé cette semaine</div>
+      ${rows}
+      <div class="pt-note ${short ? 'under' : 'ok'}">${short
+        ? `⚠️ ${short} catégorie${short > 1 ? 's' : ''} sous l'objectif <strong>${LEVELS[PLAN_STATE.target].name}</strong> — ajuste les valeurs ou ajoute une séance.`
+        : `✅ Objectif <strong>${LEVELS[PLAN_STATE.target].name}</strong> couvert dans toutes les catégories.`}</div>
+    </div>`;
 }
 
 /* ---- Adoption du plan → agenda ---- */

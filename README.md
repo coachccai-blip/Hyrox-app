@@ -21,7 +21,11 @@ des semaines passées et met en avant tes **records all-time**.
   (Équilibré · Week-end chargé · Matinal · Doubles séances). Chaque séance est posée sur un **jour précis**
   avec **matin ou soir**, et l'ordre est optimisé pour la récupération : jamais deux séances dures collées,
   alternance muscu/course, et enchaînement dimanche → lundi valide pour répéter la semaine.
-  Les **valeurs sont modifiables** avant d'adopter le plan.
+  Les **valeurs sont modifiables** avant d'adopter le plan, le **type de séance de course**
+  se change à la volée (sortie longue / tempo / fractionné / footing), et un **récapitulatif des totaux**
+  compare en direct ce qui est programmé à l'objectif visé.
+  Le **fractionné est plafonné à 4 km** par séance (prévention des blessures) : le surplus de
+  kilométrage est automatiquement redistribué sur les autres sorties.
 - **Agenda** (bouton en haut à droite) : le plan adopté s'y affiche jour par jour (avec le jour du jour mis
   en avant), et un bouton permet de **vider le plan de la semaine** pour en choisir un autre.
 - **Mise à jour automatique** : un service worker sert toujours la dernière version en ligne, recharge
