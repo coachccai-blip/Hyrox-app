@@ -6,6 +6,28 @@
 'use strict';
 
 /* -------------------------------------------------------------------------
+   0. Mise à jour automatique (service worker)
+   L'app récupère toujours la dernière version en ligne, fonctionne hors-ligne,
+   et recharge automatiquement l'onglet quand une nouvelle version est déployée.
+   ------------------------------------------------------------------------- */
+if ('serviceWorker' in navigator) {
+  const hadController = !!navigator.serviceWorker.controller;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      const check = () => { reg.update().catch(() => {}); };
+      setInterval(check, 30 * 60 * 1000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    }).catch(() => {});
+  });
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloaded || !hadController) return; // pas de reload au tout premier chargement
+    reloaded = true;
+    window.location.reload();
+  });
+}
+
+/* -------------------------------------------------------------------------
    1. Configuration des paliers (niveaux) et couleurs de fond
    ------------------------------------------------------------------------- */
 const LEVELS = [
@@ -1476,7 +1498,123 @@ renderPresets();
 renderMinPresets();
 
 /* -------------------------------------------------------------------------
-   14. Démarrage
+   14. Plan d'entraînement
+   ------------------------------------------------------------------------- */
+const PLAN_KEY = 'hyrox-plan-v1';
+const MUSCU_IDS = ['burpees', 'wallballs', 'fentes', 'gainage'];
+const MUSCU_TIPS = [
+  'Enchaîne en 3–4 tours, récup 60–90 s entre les tours.',
+  'Format EMOM : une station par minute, tourne sur le circuit.',
+  'En super-set : 2 stations d’affilée, puis récup courte.',
+  'Technique avant tout : ralentis plutôt que de casser la posture.',
+];
+
+function planExercise(id) { return EXERCISES.find((e) => e.id === id); }
+function loadPlan() { try { return JSON.parse(localStorage.getItem(PLAN_KEY)) || {}; } catch (e) { return {}; } }
+function savePlan(p) { try { localStorage.setItem(PLAN_KEY, JSON.stringify(p)); } catch (e) {} }
+
+/** Arrondit un volume à une valeur "propre" selon son ordre de grandeur. */
+function roundNice(v) {
+  if (v <= 20) return Math.round(v);
+  if (v < 100) return Math.round(v / 5) * 5;
+  return Math.round(v / 10) * 10;
+}
+
+function generatePlan() {
+  const target = parseInt(document.getElementById('planTarget').value) || 1;
+  let nM = parseInt(document.getElementById('planMuscu').value); if (isNaN(nM) || nM < 0) nM = 0; nM = Math.min(7, nM);
+  let nC = parseInt(document.getElementById('planCourse').value); if (isNaN(nC) || nC < 0) nC = 0; nC = Math.min(7, nC);
+  document.getElementById('planMuscu').value = nM;
+  document.getElementById('planCourse').value = nC;
+  savePlan({ target: target, muscu: nM, course: nC, generated: true });
+
+  const weekly = {};
+  EXERCISES.forEach((ex) => { weekly[ex.id] = ex.tiers[target]; });
+
+  // Récapitulatif de l'objectif
+  const goals = EXERCISES.map((ex) => {
+    const v = ex.id === 'gainage' ? fmtSeconds(weekly[ex.id]) : `${fmt(ex, weekly[ex.id])} ${ex.unit}`;
+    return `<span class="ps-goal"><span class="g-em">${ex.emoji}</span>${ex.name} : ${v}</span>`;
+  }).join('');
+  let note = '';
+  if (nM === 0) note += 'Ajoute au moins 1 séance muscu pour répartir burpees, wallballs, fentes et gainage. ';
+  if (nC === 0 && weekly.course > 0) note += 'Ajoute au moins 1 séance course pour la distance visée.';
+  document.getElementById('planSummary').innerHTML = `
+    <div class="ps-card">
+      <div class="ps-title">Objectif : <strong>${LEVELS[target].name}</strong> — volume hebdo à viser</div>
+      <div class="ps-goals">${goals}</div>
+      ${note ? `<div class="ps-note">⚠️ ${note}</div>` : ''}
+    </div>`;
+
+  // Cartes de séances
+  const host = document.getElementById('planCards');
+  host.innerHTML = '';
+
+  for (let s = 1; s <= nM; s++) {
+    const items = MUSCU_IDS.map((id) => {
+      const ex = planExercise(id);
+      const per = weekly[id] / nM;
+      const val = id === 'gainage' ? fmtSeconds(roundNice(per)) : `${roundNice(per)} ${ex.unit}`;
+      return `<li><span class="pc-ex">${ex.emoji} ${ex.name}</span><span class="pc-val">${val}</span></li>`;
+    }).join('');
+    const card = document.createElement('div');
+    card.className = 'plan-card muscu';
+    card.innerHTML = `
+      <div class="pc-head">
+        <div class="pc-emoji">🏋️</div>
+        <div><div class="pc-kind">Muscu / Hyrox</div>
+          <div class="pc-title">Séance ${s}<span class="pc-sub">${s}/${nM} muscu</span></div></div>
+      </div>
+      <ul class="pc-list">${items}</ul>
+      <div class="pc-tip">${MUSCU_TIPS[(s - 1) % MUSCU_TIPS.length]}</div>`;
+    host.appendChild(card);
+  }
+
+  const COURSE_TYPES = [
+    { name: 'Endurance', tip: 'Allure facile et régulière : tu dois pouvoir parler en courant.' },
+    { name: 'Fractionné', tip: 'Ex. 8×400 m rapides, 1 min de récup entre chaque.' },
+    { name: 'Tempo', tip: 'Allure soutenue mais tenue, proche de ton rythme de course visé.' },
+  ];
+  for (let s = 1; s <= nC; s++) {
+    const per = weekly.course / nC;
+    const km = Math.round(per * 10) / 10;
+    const t = COURSE_TYPES[(s - 1) % COURSE_TYPES.length];
+    const card = document.createElement('div');
+    card.className = 'plan-card course';
+    card.innerHTML = `
+      <div class="pc-head">
+        <div class="pc-emoji">🏃</div>
+        <div><div class="pc-kind">Course</div>
+          <div class="pc-title">Séance ${s}<span class="pc-sub">${t.name}</span></div></div>
+      </div>
+      <ul class="pc-list">
+        <li><span class="pc-ex">🐆 Distance</span><span class="pc-val">${km} km</span></li>
+        <li><span class="pc-ex">🎯 Type</span><span class="pc-val">${t.name}</span></li>
+      </ul>
+      <div class="pc-tip">${t.tip}</div>`;
+    host.appendChild(card);
+  }
+}
+
+function initPlanUI() {
+  const sel = document.getElementById('planTarget');
+  sel.innerHTML = '';
+  for (let i = 1; i < LEVELS.length; i++) {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = LEVELS[i].name;
+    sel.appendChild(o);
+  }
+  const saved = loadPlan();
+  sel.value = saved.target || 3;
+  document.getElementById('planMuscu').value = saved.muscu != null ? saved.muscu : 3;
+  document.getElementById('planCourse').value = saved.course != null ? saved.course : 2;
+  document.getElementById('planGenerate').addEventListener('click', generatePlan);
+  if (saved.generated) generatePlan();
+}
+initPlanUI();
+
+/* -------------------------------------------------------------------------
+   15. Démarrage
    ------------------------------------------------------------------------- */
 (function init() {
   const didReset = ensureCurrentWeek(STATE);

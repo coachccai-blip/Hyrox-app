@@ -284,12 +284,13 @@ em { color: var(--volt); font-style: normal; font-weight: 700; }
   border-top: 1px solid var(--line);
 }
 .tab {
-  flex: 1; border: none; background: transparent; color: var(--muted);
+  flex: 1; min-width: 0; border: none; background: transparent; color: var(--muted);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+  font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em;
   cursor: pointer; position: relative; transition: color 0.15s ease;
+  padding: 0 2px; white-space: nowrap;
 }
-.tab svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tab svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .tab.active { color: var(--volt); }
 .tab.active::before { content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 26px; height: 3px; background: var(--volt); border-radius: 0 0 3px 3px; }
 
@@ -351,6 +352,44 @@ input[type="date"].field { color-scheme: dark; }
 .lightbox { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,0.92); display: grid; place-items: center; padding: 20px; }
 .lightbox img { max-width: 100%; max-height: 90vh; border-radius: 10px; }
 .lightbox-close { position: absolute; top: 16px; right: 18px; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: rgba(0,0,0,0.6); color: #fff; font-size: 18px; cursor: pointer; }
+
+/* ---------------- Plan ---------------- */
+.plan-form { display: flex; flex-direction: column; gap: 8px; }
+.plan-form select.field { color-scheme: dark; }
+.plan-nums { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+@media (max-width: 400px) { .plan-nums { grid-template-columns: 1fr; } }
+.plan-nums label { display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
+.plan-nums input { background: var(--bg-soft); border: 1px solid var(--line); border-radius: 10px; color: var(--text); padding: 10px 12px; font-size: 18px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+.plan-nums input:focus, .plan-form select:focus { outline: none; border-color: var(--volt); }
+.plan-form .btn-volt { margin-top: 10px; }
+
+.plan-summary { margin-top: 4px; }
+.plan-summary:empty { display: none; }
+.plan-summary .ps-card { background: linear-gradient(135deg, rgba(212,251,46,0.12), transparent 55%), var(--panel-2); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-top: 14px; }
+.plan-summary .ps-title { font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 0.03em; }
+.plan-summary .ps-title strong { color: var(--volt); }
+.plan-summary .ps-goals { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.plan-summary .ps-goal { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 11px; font-size: 12px; font-weight: 700; }
+.plan-summary .ps-goal .g-em { margin-right: 5px; }
+.plan-summary .ps-note { font-size: 12px; color: var(--danger); margin-top: 10px; }
+
+.plan-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.plan-cards:empty { display: none; }
+.plan-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.plan-card.muscu { border-top: 3px solid var(--volt); }
+.plan-card.course { border-top: 3px solid #4dc3ff; }
+.pc-head { display: flex; align-items: center; gap: 10px; }
+.pc-emoji { width: 40px; height: 40px; display: grid; place-items: center; font-size: 22px; border-radius: 11px; background: var(--panel-2); border: 1px solid var(--line); }
+.pc-kind { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 800; }
+.pc-title { font-weight: 800; font-size: 15px; }
+.pc-title .pc-sub { display: block; font-size: 11px; font-weight: 600; color: #4dc3ff; }
+.plan-card.muscu .pc-title .pc-sub { color: var(--volt); }
+.pc-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.pc-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; border-bottom: 1px dashed var(--line-soft); padding-bottom: 7px; }
+.pc-list li:last-child { border-bottom: none; padding-bottom: 0; }
+.pc-list .pc-ex { color: var(--muted); display: flex; align-items: center; gap: 7px; }
+.pc-list .pc-val { font-weight: 800; font-variant-numeric: tabular-nums; }
+.pc-tip { font-size: 11px; color: var(--muted); background: var(--bg-soft); border-radius: 9px; padding: 8px 10px; }
 
 /* ---------------- Timer ---------------- */
 .sound-toggle { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 13px; color: var(--muted); cursor: pointer; font-weight: 700; }

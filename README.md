@@ -15,6 +15,11 @@ des semaines passées et met en avant tes **records all-time**.
   **effets sonores** et **presets enregistrables**. Animations dédiées : un **chat qui court dans une
   roue de hamster** pour le chrono, un **chat en gainage** (qui tremble et transpire) pour le minuteur.
 - **Bruitages d'interface** : un petit clic sonore sur chaque bouton (désactivable via 🔊 dans l'onglet Timer).
+- **Plan d'entraînement** : choisis ton **objectif** (palier visé), ton nombre de **séances muscu** et de
+  **séances course** par semaine → l'app génère une **carte par séance** (ex. 3 muscu + 3 course = 6 cartes)
+  avec le détail des volumes à réaliser pour atteindre le palier.
+- **Mise à jour automatique** : un service worker sert toujours la dernière version en ligne, recharge
+  l'onglet quand une nouvelle version est déployée, et permet l'usage **hors-ligne** (PWA installable).
 - **Historique éditable** : modifie le volume d'une semaine passée, supprime-la, ou **ajoute une semaine
   oubliée** (choix de la semaine ISO) — les records se recalculent automatiquement.
 - **Compte à rebours en direct** vers le prochain lundi 00:00, au format `Xj HH:MM:SS`.
@@ -87,6 +92,8 @@ typographie athlétique en capitales italiques, icônes ligne. Les 7 couleurs de
 
 - `hyrox-journal-v1` — quest hebdomadaire (semaine en cours, historique, records).
 - `hyrox-journal-stories-v1` — story journal (indépendant du quest).
+- `hyrox-timer-presets-v1` / `hyrox-timer-min-presets-v1` — presets d'intervalles et de minuteur.
+- `hyrox-plan-v1` — dernier plan d'entraînement (objectif + séances).
 
 ## 🖼️ Logo & icône d'application
 
