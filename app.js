@@ -1502,12 +1502,55 @@ renderMinPresets();
    ------------------------------------------------------------------------- */
 const PLAN_KEY = 'hyrox-plan-v1';
 const MUSCU_IDS = ['burpees', 'wallballs', 'fentes', 'gainage'];
-const MUSCU_TIPS = [
-  'Enchaîne en 3–4 tours, récup 60–90 s entre les tours.',
-  'Format EMOM : une station par minute, tourne sur le circuit.',
-  'En super-set : 2 stations d’affilée, puis récup courte.',
-  'Technique avant tout : ralentis plutôt que de casser la posture.',
+
+/* Archétypes de séances. Chaque séance a une dominante différente : on ne
+   répartit pas le volume à parts égales, on le concentre là où la séance a un
+   objectif précis (puissance, jambes, spécifique course...). Les poids sont
+   normalisés, donc le total hebdo reste exactement celui de l'objectif. */
+const MUSCU_SESSIONS = [
+  { name: 'Puissance', emoji: '💥', rpe: 'RPE 8 · qualité',
+    w: { burpees: 0.8, wallballs: 1.4, fentes: 0.8, gainage: 1 },
+    tip: 'Séries courtes et explosives, récup complète (90 s). La qualité prime sur la fatigue.' },
+  { name: 'Jambes & Grip', emoji: '🦵', rpe: 'RPE 7 · volume',
+    w: { burpees: 0.8, wallballs: 0.8, fentes: 1.5, gainage: 1 },
+    tip: 'Fentes en blocs de 20 m, gainage entre les blocs. Amplitude complète avant la charge.' },
+  { name: 'Simulation Hyrox', emoji: '🏁', rpe: 'RPE 9 · spécifique',
+    w: { burpees: 1.4, wallballs: 1, fentes: 0.9, gainage: 1 },
+    tip: 'Enchaîne station + 400 m de course sans pause : apprends à courir sur jambes fatiguées.' },
+  { name: 'Capacité', emoji: '🔋', rpe: 'RPE 7 · continu',
+    w: { burpees: 1, wallballs: 1, fentes: 1, gainage: 1 },
+    tip: 'Rythme régulier, récup courte (30–45 s). Objectif : tenir le volume proprement.' },
 ];
+
+const COURSE_SESSIONS = [
+  { name: 'Sortie longue', rpe: 'RPE 5–6 · facile', w: 1.6,
+    tip: 'Allure facile : tu dois pouvoir parler en courant. C’est le socle de ton endurance.' },
+  { name: 'Fractionné', rpe: 'RPE 9 · intense', w: 0.65,
+    tip: 'Ex. 8×400 m rapides, 1 min de récup. Court en volume, mais c’est là que la vitesse se gagne.' },
+  { name: 'Tempo', rpe: 'RPE 7–8 · soutenu', w: 1.0,
+    tip: 'Allure soutenue et tenue, proche de ton rythme de course visé en compétition.' },
+  { name: 'Footing récup', rpe: 'RPE 4–5 · récup', w: 0.8,
+    tip: 'Très facile, jambes légères. Cette séance sert à récupérer, pas à performer.' },
+];
+
+/**
+ * Répartit un volume total selon des poids, en garantissant que la somme
+ * des valeurs affichées vaut exactement le total (la dernière absorbe le reste).
+ */
+function distribute(total, weights, decimals) {
+  const sum = weights.reduce((a, b) => a + b, 0) || 1;
+  const out = [];
+  let acc = 0;
+  for (let i = 0; i < weights.length - 1; i++) {
+    const raw = total * weights[i] / sum;
+    const v = decimals ? Math.round(raw * 10) / 10 : roundNice(raw);
+    out.push(v); acc += v;
+  }
+  let last = Math.max(0, total - acc);
+  last = decimals ? Math.round(last * 10) / 10 : Math.round(last);
+  out.push(last);
+  return out;
+}
 
 function planExercise(id) { return EXERCISES.find((e) => e.id === id); }
 function loadPlan() { try { return JSON.parse(localStorage.getItem(PLAN_KEY)) || {}; } catch (e) { return {}; } }
@@ -1524,9 +1567,10 @@ function generatePlan() {
   const target = parseInt(document.getElementById('planTarget').value) || 1;
   let nM = parseInt(document.getElementById('planMuscu').value); if (isNaN(nM) || nM < 0) nM = 0; nM = Math.min(7, nM);
   let nC = parseInt(document.getElementById('planCourse').value); if (isNaN(nC) || nC < 0) nC = 0; nC = Math.min(7, nC);
+  const equal = document.getElementById('planEqual').checked;
   document.getElementById('planMuscu').value = nM;
   document.getElementById('planCourse').value = nC;
-  savePlan({ target: target, muscu: nM, course: nC, generated: true });
+  savePlan({ target: target, muscu: nM, course: nC, equal: equal, generated: true });
 
   const weekly = {};
   EXERCISES.forEach((ex) => { weekly[ex.id] = ex.tiers[target]; });
@@ -1539,10 +1583,14 @@ function generatePlan() {
   let note = '';
   if (nM === 0) note += 'Ajoute au moins 1 séance muscu pour répartir burpees, wallballs, fentes et gainage. ';
   if (nC === 0 && weekly.course > 0) note += 'Ajoute au moins 1 séance course pour la distance visée.';
+  const method = equal
+    ? 'Répartition égale : chaque séance est identique. Simple, mais moins efficace pour progresser.'
+    : 'Répartition intelligente : chaque séance a une dominante (puissance, jambes, spécifique) et la course est polarisée — une sortie longue facile, un fractionné court et intense, un tempo. Le total de la semaine reste exactement celui de ton objectif.';
   document.getElementById('planSummary').innerHTML = `
     <div class="ps-card">
       <div class="ps-title">Objectif : <strong>${LEVELS[target].name}</strong> — volume hebdo à viser</div>
       <div class="ps-goals">${goals}</div>
+      <div class="ps-method">${method}</div>
       ${note ? `<div class="ps-note">⚠️ ${note}</div>` : ''}
     </div>`;
 
@@ -1550,50 +1598,63 @@ function generatePlan() {
   const host = document.getElementById('planCards');
   host.innerHTML = '';
 
-  for (let s = 1; s <= nM; s++) {
+  // --- Muscu : une dominante différente par séance ---
+  const mProfiles = [];
+  for (let s = 0; s < nM; s++) {
+    mProfiles.push(equal
+      ? { name: 'Séance type', emoji: '🏋️', rpe: 'RPE 7 · continu',
+          w: { burpees: 1, wallballs: 1, fentes: 1, gainage: 1 },
+          tip: 'Rythme régulier, récup courte (30–45 s). Volume identique à chaque séance.' }
+      : MUSCU_SESSIONS[s % MUSCU_SESSIONS.length]);
+  }
+  const mSplit = {};
+  MUSCU_IDS.forEach((id) => {
+    mSplit[id] = distribute(weekly[id], mProfiles.map((p) => p.w[id]), false);
+  });
+  mProfiles.forEach((p, s) => {
     const items = MUSCU_IDS.map((id) => {
       const ex = planExercise(id);
-      const per = weekly[id] / nM;
-      const val = id === 'gainage' ? fmtSeconds(roundNice(per)) : `${roundNice(per)} ${ex.unit}`;
+      const v = mSplit[id][s];
+      const val = id === 'gainage' ? fmtSeconds(v) : `${v} ${ex.unit}`;
       return `<li><span class="pc-ex">${ex.emoji} ${ex.name}</span><span class="pc-val">${val}</span></li>`;
     }).join('');
     const card = document.createElement('div');
     card.className = 'plan-card muscu';
     card.innerHTML = `
       <div class="pc-head">
-        <div class="pc-emoji">🏋️</div>
-        <div><div class="pc-kind">Muscu / Hyrox</div>
-          <div class="pc-title">Séance ${s}<span class="pc-sub">${s}/${nM} muscu</span></div></div>
+        <div class="pc-emoji">${p.emoji}</div>
+        <div><div class="pc-kind">Muscu ${s + 1}/${nM}</div>
+          <div class="pc-title">${p.name}<span class="pc-sub">${p.rpe}</span></div></div>
       </div>
       <ul class="pc-list">${items}</ul>
-      <div class="pc-tip">${MUSCU_TIPS[(s - 1) % MUSCU_TIPS.length]}</div>`;
+      <div class="pc-tip">${p.tip}</div>`;
     host.appendChild(card);
-  }
+  });
 
-  const COURSE_TYPES = [
-    { name: 'Endurance', tip: 'Allure facile et régulière : tu dois pouvoir parler en courant.' },
-    { name: 'Fractionné', tip: 'Ex. 8×400 m rapides, 1 min de récup entre chaque.' },
-    { name: 'Tempo', tip: 'Allure soutenue mais tenue, proche de ton rythme de course visé.' },
-  ];
-  for (let s = 1; s <= nC; s++) {
-    const per = weekly.course / nC;
-    const km = Math.round(per * 10) / 10;
-    const t = COURSE_TYPES[(s - 1) % COURSE_TYPES.length];
+  // --- Course : sortie longue / fractionné / tempo (polarisé ~80-20) ---
+  const cProfiles = [];
+  for (let s = 0; s < nC; s++) {
+    cProfiles.push(equal
+      ? { name: 'Course', rpe: 'RPE 6–7 · régulier', w: 1,
+          tip: 'Allure régulière. Distance identique à chaque séance.' }
+      : COURSE_SESSIONS[s % COURSE_SESSIONS.length]);
+  }
+  const cSplit = distribute(weekly.course, cProfiles.map((p) => p.w), true);
+  cProfiles.forEach((p, s) => {
     const card = document.createElement('div');
     card.className = 'plan-card course';
     card.innerHTML = `
       <div class="pc-head">
         <div class="pc-emoji">🏃</div>
-        <div><div class="pc-kind">Course</div>
-          <div class="pc-title">Séance ${s}<span class="pc-sub">${t.name}</span></div></div>
+        <div><div class="pc-kind">Course ${s + 1}/${nC}</div>
+          <div class="pc-title">${p.name}<span class="pc-sub">${p.rpe}</span></div></div>
       </div>
       <ul class="pc-list">
-        <li><span class="pc-ex">🐆 Distance</span><span class="pc-val">${km} km</span></li>
-        <li><span class="pc-ex">🎯 Type</span><span class="pc-val">${t.name}</span></li>
+        <li><span class="pc-ex">🐆 Distance</span><span class="pc-val">${cSplit[s]} km</span></li>
       </ul>
-      <div class="pc-tip">${t.tip}</div>`;
+      <div class="pc-tip">${p.tip}</div>`;
     host.appendChild(card);
-  }
+  });
 }
 
 function initPlanUI() {
@@ -1608,6 +1669,7 @@ function initPlanUI() {
   sel.value = saved.target || 3;
   document.getElementById('planMuscu').value = saved.muscu != null ? saved.muscu : 3;
   document.getElementById('planCourse').value = saved.course != null ? saved.course : 2;
+  document.getElementById('planEqual').checked = !!saved.equal;
   document.getElementById('planGenerate').addEventListener('click', generatePlan);
   if (saved.generated) generatePlan();
 }
