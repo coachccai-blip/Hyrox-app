@@ -29,8 +29,8 @@ des semaines passées et met en avant tes **records all-time**.
 - **Historique éditable** : modifie le volume d'une semaine passée, supprime-la, ou **ajoute une semaine
   oubliée** (choix de la semaine ISO) — les records se recalculent automatiquement.
 - **Compte à rebours en direct** vers le prochain lundi 00:00, au format `Xj HH:MM:SS`.
-- **Story Journal** (bouton en haut à droite) : une galerie mosaïque de tes séances marquantes
-  (titre, description, plusieurs photos, lightbox plein écran). **Sans champ prix.**
+- **Story Journal** (onglet *Journal*) : une galerie mosaïque de tes séances marquantes
+  (titre, **date**, description, plusieurs photos, lightbox plein écran). **Sans champ prix.**
   Photos redimensionnées dans le navigateur (max 1200 px) et stockées à part.
 - **Réinitialisation automatique chaque lundi** (semaine ISO). Le volume de la semaine écoulée est archivé.
 - **Historique consultable** de chaque semaine passée, avec le titre atteint dans chaque catégorie.
