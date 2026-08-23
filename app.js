@@ -980,21 +980,12 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!document.getElementById('lightbox').classList.contains('hidden')) { closeLightbox(); return; }
   if (!document.getElementById('storyEditor').classList.contains('hidden')) { closeStoryEditor(); return; }
-  if (!document.getElementById('weekEditor').classList.contains('hidden')) { closeWeekEditor(); }
+  if (!document.getElementById('weekEditor').classList.contains('hidden')) { closeWeekEditor(); return; }
+  if (!document.getElementById('calendarView').classList.contains('hidden')) { toggleCalendar(false); }
 });
 
-/* ---- Ouverture / fermeture du journal ---- */
-function toggleJournal(open) {
-  const j = document.getElementById('storyJournal');
-  const show = open != null ? open : j.classList.contains('hidden');
-  j.classList.toggle('hidden', !show);
-  document.getElementById('tabbar').style.display = show ? 'none' : '';
-  document.querySelectorAll('.page').forEach((p) => { p.style.visibility = show ? 'hidden' : ''; });
-  document.querySelector('.topbar').style.display = show ? 'none' : '';
-  if (show) { renderStories(); window.scrollTo(0, 0); }
-}
-document.getElementById('journalToggle').addEventListener('click', () => toggleJournal(true));
-document.getElementById('journalClose').addEventListener('click', () => toggleJournal(false));
+/* Le Story Journal est désormais un onglet : il se rend au chargement. */
+renderStories();
 
 /* -------------------------------------------------------------------------
    10. Réinitialisation globale
@@ -1552,9 +1543,128 @@ function distribute(total, weights, decimals) {
   return out;
 }
 
+const WEEK_PLAN_KEY = 'hyrox-week-plan-v1';
+const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+
+/* Charge (1–10) utilisée pour espacer les séances dures dans la semaine. */
+const CHARGE = {
+  'Puissance': 8, 'Jambes & Grip': 7, 'Simulation Hyrox': 9, 'Capacité': 6, 'Séance type': 7,
+  'Sortie longue': 7, 'Fractionné': 9, 'Tempo': 7, 'Footing récup': 3, 'Course': 6,
+};
+
+/* 4 organisations de semaine. Même charge d'entraînement, 4 façons de la poser. */
+const PLAN_VARIANTS = [
+  { id: 'equilibre', name: 'Équilibré', icon: '⚖️',
+    desc: 'Séances étalées sur la semaine, jamais deux jours durs collés. Le meilleur compromis récupération / régularité.',
+    days: { 1: [2], 2: [1, 4], 3: [0, 2, 4], 4: [0, 2, 4, 6], 5: [0, 1, 3, 4, 6], 6: [0, 1, 2, 4, 5, 6], 7: [0, 1, 2, 3, 4, 5, 6] },
+    moment: (d, slot, charge) => (slot === 1 ? 'Soir' : (charge >= 8 ? 'Matin' : 'Soir')) },
+  { id: 'weekend', name: 'Week-end chargé', icon: '📅',
+    desc: 'Le gros du volume le samedi et le dimanche, semaine allégée en soirée. Idéal si tes journées sont prises.',
+    days: { 1: [5], 2: [5, 6], 3: [2, 5, 6], 4: [1, 3, 5, 6], 5: [1, 2, 3, 5, 6], 6: [0, 1, 2, 3, 5, 6], 7: [0, 1, 2, 3, 4, 5, 6] },
+    moment: (d, slot) => (slot === 1 ? 'Soir' : (d >= 5 ? 'Matin' : 'Soir')) },
+  { id: 'matinal', name: 'Matinal', icon: '🌅',
+    desc: 'Tout se fait le matin, soirées libres. Demande de se coucher tôt mais garantit que la séance est faite.',
+    days: { 1: [2], 2: [1, 4], 3: [0, 2, 4], 4: [0, 2, 4, 6], 5: [0, 1, 3, 4, 6], 6: [0, 1, 2, 4, 5, 6], 7: [0, 1, 2, 3, 4, 5, 6] },
+    moment: () => 'Matin' },
+  { id: 'double', name: 'Doubles séances', icon: '⚡',
+    desc: 'Deux séances le même jour (matin + soir) pour libérer davantage de jours de repos complets.',
+    days: null, // calculé : 2 séances par jour
+    moment: (d, slot) => (slot === 0 ? 'Matin' : 'Soir') },
+];
+
 function planExercise(id) { return EXERCISES.find((e) => e.id === id); }
 function loadPlan() { try { return JSON.parse(localStorage.getItem(PLAN_KEY)) || {}; } catch (e) { return {}; } }
 function savePlan(p) { try { localStorage.setItem(PLAN_KEY, JSON.stringify(p)); } catch (e) {} }
+/** Le plan adopté est conçu pour tourner en boucle : on le reporte sur la
+    semaine en cours tant que l'utilisateur ne l'a pas vidé. */
+function loadWeekPlan() {
+  try {
+    const p = JSON.parse(localStorage.getItem(WEEK_PLAN_KEY));
+    if (!p) return null;
+    if (typeof STATE !== 'undefined' && STATE && p.week !== STATE.currentWeek) {
+      p.week = STATE.currentWeek;
+      saveWeekPlan(p);
+    }
+    return p;
+  } catch (e) { return null; }
+}
+function saveWeekPlan(p) { try { localStorage.setItem(WEEK_PLAN_KEY, JSON.stringify(p)); } catch (e) {} }
+
+/** Créneaux (jour + rang dans la journée) pour n séances selon la variante. */
+function slotsFor(variant, n) {
+  if (n <= 0) return [];
+  if (variant.id === 'double') {
+    const base = [0, 2, 4, 6, 1, 3, 5];
+    const nDays = Math.ceil(n / 2);
+    const days = base.slice(0, nDays).sort((a, b) => a - b);
+    const out = [];
+    for (let k = 0; k < n; k++) out.push({ day: days[Math.floor(k / 2)], slot: k % 2 });
+    return out;
+  }
+  if (n <= 7) return (variant.days[n] || [0, 1, 2, 3, 4, 5, 6]).map((d) => ({ day: d, slot: 0 }));
+  const out = [0, 1, 2, 3, 4, 5, 6].map((d) => ({ day: d, slot: 0 }));
+  for (let k = 7; k < n && k - 7 < 7; k++) out.push({ day: k - 7, slot: 1 });
+  return out.sort((a, b) => (a.day - b.day) || (a.slot - b.slot));
+}
+
+/** Alterne muscu / course pour éviter deux séances du même type d'affilée. */
+function interleaveByKind(sessions) {
+  const m = sessions.filter((s) => s.kind === 'muscu');
+  const c = sessions.filter((s) => s.kind === 'course');
+  const out = [];
+  const [long, short] = m.length >= c.length ? [m, c] : [c, m];
+  while (long.length || short.length) {
+    if (long.length) out.push(long.shift());
+    if (short.length) out.push(short.shift());
+  }
+  return out;
+}
+
+/**
+ * Pénalise un enchaînement : deux séances dures collées, deux fois le même
+ * type d'affilée, et le passage d'une semaine à l'autre (dimanche → lundi)
+ * pour que le plan puisse tourner en boucle chaque semaine.
+ */
+function schedulePenalty(order, slots) {
+  let p = 0;
+  for (let i = 1; i < order.length; i++) {
+    const gap = slots[i].day - slots[i - 1].day;
+    const a = order[i - 1], b = order[i];
+    if (gap <= 1) {
+      if (a.charge >= 8 && b.charge >= 8) p += 10;
+      if (a.kind === b.kind) p += 3;
+      if (gap === 0) p += (a.charge + b.charge) / 4;
+    }
+  }
+  if (order.length > 1) {
+    const wrap = (6 - slots[slots.length - 1].day) + slots[0].day; // dimanche → lundi suivant
+    if (wrap <= 1 && order[order.length - 1].charge >= 8 && order[0].charge >= 8) p += 8;
+  }
+  return p;
+}
+
+/** Place les séances sur la semaine et optimise l'enchaînement par échanges. */
+function schedulePlan(sessions, variant) {
+  const slots = slotsFor(variant, sessions.length);
+  let best = interleaveByKind(sessions);
+  let bestP = schedulePenalty(best, slots);
+  for (let pass = 0; pass < 40 && bestP > 0; pass++) {
+    let improved = false;
+    for (let i = 0; i < best.length && !improved; i++) {
+      for (let j = i + 1; j < best.length; j++) {
+        const cand = best.slice();
+        const t = cand[i]; cand[i] = cand[j]; cand[j] = t;
+        const p = schedulePenalty(cand, slots);
+        if (p < bestP) { best = cand; bestP = p; improved = true; break; }
+      }
+    }
+    if (!improved) break;
+  }
+  return best.map((s, i) => Object.assign({}, s, {
+    day: slots[i].day,
+    part: variant.moment(slots[i].day, slots[i].slot, s.charge),
+  }));
+}
 
 /** Arrondit un volume à une valeur "propre" selon son ordre de grandeur. */
 function roundNice(v) {
@@ -1594,11 +1704,9 @@ function generatePlan() {
       ${note ? `<div class="ps-note">⚠️ ${note}</div>` : ''}
     </div>`;
 
-  // Cartes de séances
-  const host = document.getElementById('planCards');
-  host.innerHTML = '';
+  // --- Construction des séances (contenu identique dans les 4 variantes) ---
+  const sessions = [];
 
-  // --- Muscu : une dominante différente par séance ---
   const mProfiles = [];
   for (let s = 0; s < nM; s++) {
     mProfiles.push(equal
@@ -1612,26 +1720,17 @@ function generatePlan() {
     mSplit[id] = distribute(weekly[id], mProfiles.map((p) => p.w[id]), false);
   });
   mProfiles.forEach((p, s) => {
-    const items = MUSCU_IDS.map((id) => {
-      const ex = planExercise(id);
-      const v = mSplit[id][s];
-      const val = id === 'gainage' ? fmtSeconds(v) : `${v} ${ex.unit}`;
-      return `<li><span class="pc-ex">${ex.emoji} ${ex.name}</span><span class="pc-val">${val}</span></li>`;
-    }).join('');
-    const card = document.createElement('div');
-    card.className = 'plan-card muscu';
-    card.innerHTML = `
-      <div class="pc-head">
-        <div class="pc-emoji">${p.emoji}</div>
-        <div><div class="pc-kind">Muscu ${s + 1}/${nM}</div>
-          <div class="pc-title">${p.name}<span class="pc-sub">${p.rpe}</span></div></div>
-      </div>
-      <ul class="pc-list">${items}</ul>
-      <div class="pc-tip">${p.tip}</div>`;
-    host.appendChild(card);
+    sessions.push({
+      kind: 'muscu', name: p.name, emoji: p.emoji, rpe: p.rpe, tip: p.tip,
+      charge: CHARGE[p.name] || 7,
+      items: MUSCU_IDS.map((id) => {
+        const ex = planExercise(id);
+        return { id: id, label: ex.name, emoji: ex.emoji, unit: ex.unit,
+                 value: mSplit[id][s], isTime: id === 'gainage', decimals: false };
+      }),
+    });
   });
 
-  // --- Course : sortie longue / fractionné / tempo (polarisé ~80-20) ---
   const cProfiles = [];
   for (let s = 0; s < nC; s++) {
     cProfiles.push(equal
@@ -1641,21 +1740,181 @@ function generatePlan() {
   }
   const cSplit = distribute(weekly.course, cProfiles.map((p) => p.w), true);
   cProfiles.forEach((p, s) => {
-    const card = document.createElement('div');
-    card.className = 'plan-card course';
-    card.innerHTML = `
-      <div class="pc-head">
-        <div class="pc-emoji">🏃</div>
-        <div><div class="pc-kind">Course ${s + 1}/${nC}</div>
-          <div class="pc-title">${p.name}<span class="pc-sub">${p.rpe}</span></div></div>
-      </div>
-      <ul class="pc-list">
-        <li><span class="pc-ex">🐆 Distance</span><span class="pc-val">${cSplit[s]} km</span></li>
-      </ul>
-      <div class="pc-tip">${p.tip}</div>`;
-    host.appendChild(card);
+    sessions.push({
+      kind: 'course', name: p.name, emoji: '🏃', rpe: p.rpe, tip: p.tip,
+      charge: CHARGE[p.name] || 6,
+      items: [{ id: 'course', label: 'Distance', emoji: '🐆', unit: 'km',
+                value: cSplit[s], isTime: false, decimals: true }],
+    });
+  });
+
+  // --- 4 organisations de semaine ---
+  PLAN_STATE = {
+    target: target,
+    variants: PLAN_VARIANTS.map((v) => ({
+      id: v.id, name: v.name, icon: v.icon, desc: v.desc,
+      sessions: schedulePlan(sessions.map((s) => JSON.parse(JSON.stringify(s))), v)
+        .sort((a, b) => (a.day - b.day) || (a.part === 'Matin' ? -1 : 1)),
+    })),
+    selected: 0,
+  };
+  renderPlanVariants();
+  selectPlanVariant(0);
+}
+
+/* ---- Sélecteur de variante ---- */
+let PLAN_STATE = null;
+
+function daySummary(sessions) {
+  const byDay = {};
+  sessions.forEach((s) => { (byDay[s.day] = byDay[s.day] || []).push(s); });
+  const days = Object.keys(byDay).map(Number).sort((a, b) => a - b);
+  const rest = 7 - days.length;
+  return `${days.map((d) => DAYS[d].slice(0, 3)).join(' · ')} — ${rest} jour${rest > 1 ? 's' : ''} de repos`;
+}
+
+function renderPlanVariants() {
+  const host = document.getElementById('planVariants');
+  host.innerHTML = '';
+  if (!PLAN_STATE) return;
+  PLAN_STATE.variants.forEach((v, i) => {
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'variant-pill' + (i === PLAN_STATE.selected ? ' active' : '');
+    el.innerHTML = `
+      <div class="vp-head"><span class="vp-icon">${v.icon}</span><span class="vp-name">${v.name}</span></div>
+      <div class="vp-days">${daySummary(v.sessions)}</div>
+      <div class="vp-desc">${v.desc}</div>`;
+    el.addEventListener('click', () => selectPlanVariant(i));
+    host.appendChild(el);
   });
 }
+
+/** Affiche les cartes de la variante choisie, avec valeurs éditables. */
+function selectPlanVariant(idx) {
+  if (!PLAN_STATE) return;
+  PLAN_STATE.selected = idx;
+  renderPlanVariants();
+  const v = PLAN_STATE.variants[idx];
+  const host = document.getElementById('planCards');
+  host.innerHTML = '';
+
+  v.sessions.forEach((s, si) => {
+    const items = s.items.map((it, ii) => `
+      <li>
+        <span class="pc-ex">${it.emoji} ${it.label}</span>
+        <span class="pc-edit">
+          <input type="number" min="0" step="${it.decimals ? '0.1' : '1'}" value="${it.value}"
+                 data-s="${si}" data-i="${ii}" aria-label="${it.label}" />
+          <span class="pc-unit">${it.isTime ? 's' : it.unit}</span>
+        </span>
+      </li>`).join('');
+    const card = document.createElement('div');
+    card.className = 'plan-card ' + s.kind;
+    card.innerHTML = `
+      <div class="pc-day"><span class="pc-dayname">${DAYS[s.day]}</span><span class="pc-part">${s.part === 'Matin' ? '🌅 Matin' : '🌙 Soir'}</span></div>
+      <div class="pc-head">
+        <div class="pc-emoji">${s.emoji}</div>
+        <div><div class="pc-kind">${s.kind === 'muscu' ? 'Muscu' : 'Course'}</div>
+          <div class="pc-title">${s.name}<span class="pc-sub">${s.rpe}</span></div></div>
+      </div>
+      <ul class="pc-list">${items}</ul>
+      <div class="pc-tip">${s.tip}</div>`;
+    card.querySelectorAll('input').forEach((inp) => {
+      inp.addEventListener('focus', () => inp.select());
+      inp.addEventListener('change', () => {
+        let val = parseFloat(inp.value);
+        if (isNaN(val) || val < 0) val = 0;
+        const it = v.sessions[+inp.dataset.s].items[+inp.dataset.i];
+        it.value = it.decimals ? Math.round(val * 10) / 10 : Math.round(val);
+        inp.value = it.value;
+      });
+    });
+    host.appendChild(card);
+  });
+
+  document.getElementById('planAdoptBar').classList.toggle('hidden', v.sessions.length === 0);
+}
+
+/* ---- Adoption du plan → agenda ---- */
+document.getElementById('planAdopt').addEventListener('click', () => {
+  if (!PLAN_STATE) return;
+  const v = PLAN_STATE.variants[PLAN_STATE.selected];
+  saveWeekPlan({
+    week: STATE.currentWeek,
+    variantId: v.id, variantName: v.name, icon: v.icon,
+    sessions: JSON.parse(JSON.stringify(v.sessions)),
+  });
+  renderCalendar();
+  toast('📅 Plan adopté — retrouve-le dans l’agenda');
+  toggleCalendar(true);
+});
+
+/* ---- Agenda ---- */
+function renderCalendar() {
+  const host = document.getElementById('calendarBody');
+  const actions = document.getElementById('calendarActions');
+  const plan = loadWeekPlan();
+  host.innerHTML = '';
+
+  if (!plan || !plan.sessions || !plan.sessions.length) {
+    actions.classList.add('hidden');
+    host.innerHTML = `<p class="empty cal-empty">Aucun plan adopté pour cette semaine.<br>
+      Va dans l'onglet <strong>Plan</strong>, génère des suggestions et adopte celle qui te convient.</p>`;
+    return;
+  }
+  actions.classList.remove('hidden');
+
+  const head = document.createElement('div');
+  head.className = 'cal-plan-head';
+  head.innerHTML = `<span class="vp-icon">${plan.icon || '📅'}</span>
+    <div><div class="cal-plan-name">${escapeHtml(plan.variantName || 'Mon plan')}</div>
+    <div class="muted">${plan.sessions.length} séance${plan.sessions.length > 1 ? 's' : ''} cette semaine</div></div>`;
+  host.appendChild(head);
+
+  const todayIdx = (new Date().getDay() + 6) % 7;
+  for (let d = 0; d < 7; d++) {
+    const daySessions = plan.sessions.filter((s) => s.day === d);
+    const row = document.createElement('div');
+    row.className = 'cal-day' + (d === todayIdx ? ' today' : '') + (daySessions.length ? '' : ' rest');
+    let inner = `<div class="cal-dayname">${DAYS[d]}${d === todayIdx ? ' <span class="cal-today">aujourd\'hui</span>' : ''}</div>`;
+    if (!daySessions.length) {
+      inner += '<div class="cal-rest">😴 Repos</div>';
+    } else {
+      inner += daySessions.map((s) => `
+        <div class="cal-session ${s.kind}">
+          <div class="cs-top">
+            <span class="cs-part">${s.part === 'Matin' ? '🌅 Matin' : '🌙 Soir'}</span>
+            <span class="cs-name">${s.emoji} ${escapeHtml(s.name)}</span>
+            <span class="cs-rpe">${escapeHtml(s.rpe)}</span>
+          </div>
+          <div class="cs-items">${s.items.map((it) =>
+            `<span class="cs-item">${it.emoji} ${it.isTime ? fmtSeconds(it.value) : it.value + ' ' + it.unit}</span>`).join('')}</div>
+        </div>`).join('');
+    }
+    row.innerHTML = inner;
+    host.appendChild(row);
+  }
+}
+
+function toggleCalendar(open) {
+  const c = document.getElementById('calendarView');
+  const show = open != null ? open : c.classList.contains('hidden');
+  if (show) renderCalendar();
+  c.classList.toggle('hidden', !show);
+  document.getElementById('tabbar').style.display = show ? 'none' : '';
+  document.querySelectorAll('.page').forEach((p) => { p.style.visibility = show ? 'hidden' : ''; });
+  document.querySelector('.topbar').style.display = show ? 'none' : '';
+  if (show) window.scrollTo(0, 0);
+}
+document.getElementById('calendarToggle').addEventListener('click', () => toggleCalendar(true));
+document.getElementById('calendarClose').addEventListener('click', () => toggleCalendar(false));
+document.getElementById('planClear').addEventListener('click', () => {
+  if (!confirm('Vider le plan de la semaine ? Tu pourras en générer un nouveau dans l’onglet Plan.')) return;
+  localStorage.removeItem(WEEK_PLAN_KEY);
+  renderCalendar();
+  toast('🧹 Plan de la semaine vidé');
+});
 
 function initPlanUI() {
   const sel = document.getElementById('planTarget');

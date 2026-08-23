@@ -9,15 +9,21 @@ des semaines passées et met en avant tes **records all-time**.
 - **Saisie hebdomadaire** de ton volume pour 5 catégories : Burpees, Wallballs, Fentes chargées, Course, Gainage.
   Le total de chaque exercice est **éditable** (bouton **Sauvegarder**), avec des ajouts
   rapides (+5 / +10 / …) et un bouton **Remise à zéro** par exercice.
-- **Navigation par barre d'onglets en bas** (inspirée de Sales Quest) : `Semaine · Progression · Succès · Timer · Historique`.
+- **Navigation par barre d'onglets en bas** : `Semaine · Progrès · Plan · Timer · Historique · Journal`,
+  plus un bouton **Agenda** en haut à droite.
 - **Timer** : chronomètre (avec tours), minuteur (compte à rebours, **presets enregistrables**) et
   **entraînement par intervalles** personnalisable (préparation / effort / repos / tours) avec
   **effets sonores** et **presets enregistrables**. Animations dédiées : un **chat qui court dans une
   roue de hamster** pour le chrono, un **chat en gainage** (qui tremble et transpire) pour le minuteur.
 - **Bruitages d'interface** : un petit clic sonore sur chaque bouton (désactivable via 🔊 dans l'onglet Timer).
 - **Plan d'entraînement** : choisis ton **objectif** (palier visé), ton nombre de **séances muscu** et de
-  **séances course** par semaine → l'app génère une **carte par séance** (ex. 3 muscu + 3 course = 6 cartes)
-  avec le détail des volumes à réaliser pour atteindre le palier.
+  **séances course** par semaine → l'app génère **4 organisations de semaine** au choix
+  (Équilibré · Week-end chargé · Matinal · Doubles séances). Chaque séance est posée sur un **jour précis**
+  avec **matin ou soir**, et l'ordre est optimisé pour la récupération : jamais deux séances dures collées,
+  alternance muscu/course, et enchaînement dimanche → lundi valide pour répéter la semaine.
+  Les **valeurs sont modifiables** avant d'adopter le plan.
+- **Agenda** (bouton en haut à droite) : le plan adopté s'y affiche jour par jour (avec le jour du jour mis
+  en avant), et un bouton permet de **vider le plan de la semaine** pour en choisir un autre.
 - **Mise à jour automatique** : un service worker sert toujours la dernière version en ligne, recharge
   l'onglet quand une nouvelle version est déployée, et permet l'usage **hors-ligne** (PWA installable).
 - **Historique éditable** : modifie le volume d'une semaine passée, supprime-la, ou **ajoute une semaine
@@ -93,7 +99,8 @@ typographie athlétique en capitales italiques, icônes ligne. Les 7 couleurs de
 - `hyrox-journal-v1` — quest hebdomadaire (semaine en cours, historique, records).
 - `hyrox-journal-stories-v1` — story journal (indépendant du quest).
 - `hyrox-timer-presets-v1` / `hyrox-timer-min-presets-v1` — presets d'intervalles et de minuteur.
-- `hyrox-plan-v1` — dernier plan d'entraînement (objectif + séances).
+- `hyrox-plan-v1` — réglages du plan (objectif + nombre de séances).
+- `hyrox-week-plan-v1` — plan adopté pour la semaine (agenda).
 
 ## 🖼️ Logo & icône d'application
 
