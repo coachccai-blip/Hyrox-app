@@ -1507,6 +1507,33 @@ const PLAN_LAYOUT = {
   moment: (d, slot) => (slot === 0 ? 'Matin' : 'Soir'),
 };
 
+/* Allure réellement tenue EN COURSE lors d'un Hyrox, par palier (1..6).
+   Bien plus lente qu'un 8 km à froid : jambes fatiguées, virages, foule.
+   Source unique, réutilisée par le simulateur. */
+const RACE_PACE = { 1: 450, 2: 405, 3: 360, 4: 315, 5: 280, 6: 255 };
+
+/* Quelle allure d'entraînement vise chaque type de séance de course. */
+const PACE_KIND = {
+  'Sortie longue': 'ef', 'Footing récup': 'ef', 'Course': 'ef',
+  'Tempo': 'seuil', 'Fractionné': 'frac',
+};
+
+/**
+ * Allures d'entraînement déduites de l'allure de course visée.
+ * Rapports classiques de la physio de l'endurance :
+ *   seuil ≈ 92,5 % du temps au km de course (≈ allure 10 km / semi)
+ *   EF    ≈ seuil + 22 %  (conversationnel, 65–75 % FCmax)
+ *   VMA   ≈ seuil − 7 %   (allure 3–5 km)
+ * Arrondi à 5 s près pour rester lisible sur une montre.
+ */
+function trainingPaces(target) {
+  const lvl = Math.max(1, Math.min(6, target));
+  const race = RACE_PACE[lvl];
+  const r5 = (x) => Math.round(x / 5) * 5;
+  const seuil = r5(race * 0.925);
+  return { race: race, ef: r5(seuil * 1.22), seuil: seuil, frac: r5(seuil * 0.93) };
+}
+
 function planExercise(id) { return EXERCISES.find((e) => e.id === id); }
 function loadPlan() { try { return JSON.parse(localStorage.getItem(PLAN_KEY)) || {}; } catch (e) { return {}; } }
 function savePlan(p) { try { localStorage.setItem(PLAN_KEY, JSON.stringify(p)); } catch (e) {} }
@@ -1658,6 +1685,7 @@ function generatePlan() {
     sessions.push({
       kind: 'course', name: p.name, emoji: '🏃', rpe: p.rpe, tip: p.tip,
       charge: CHARGE[p.name] || 6, cap: p.cap != null ? p.cap : null,
+      paceSec: trainingPaces(target)[PACE_KIND[p.name] || 'ef'],
       items: [{ id: 'course', label: 'Distance', emoji: '🐆', unit: 'km',
                 value: cSplit[s], isTime: false, decimals: true }],
     });
@@ -1683,12 +1711,30 @@ function renderPlanSummary(target, equal, note) {
   const method = equal
     ? 'Répartition égale : chaque séance est identique. Simple, mais moins efficace pour progresser.'
     : 'Répartition intelligente : chaque séance a une dominante (puissance, jambes, spécifique) et la course est polarisée — une sortie longue facile, un fractionné court et intense, un tempo. Jour, moment et valeurs restent modifiables.';
+  const pc = trainingPaces(target);
+  const paceRows = [
+    ['ef',    '🟦', 'EF — endurance fondamentale', pc.ef,    'Conversationnel, 65–75 % FCmax. Le socle : 70–80 % de ton volume.'],
+    ['seuil', '🟨', 'Seuil — tempo',               pc.seuil, 'Effort soutenu tenable ~1 h. Allure 10 km / semi.'],
+    ['frac',  '🟥', 'Fractionné — VMA',            pc.frac,  'Allure 3–5 km, sur des efforts de 30 s à 4 min.'],
+  ].map(([k, dot, label, sec, desc]) =>
+    `<div class="tp-row tp-${k}">
+       <div class="tp-left"><span class="tp-dot">${dot}</span>
+         <div><div class="tp-name">${label}</div><div class="tp-desc">${desc}</div></div></div>
+       <div class="tp-pace">${fmtMMSS(sec)}<span>/km</span></div>
+     </div>`).join('');
+
   document.getElementById('planSummary').innerHTML = `
     <div class="ps-card">
       <div class="ps-title">Objectif : <strong>${LEVELS[target].name}</strong> — volume hebdo à viser</div>
       <div class="ps-goals">${goals}</div>
       <div class="ps-method">${method}</div>
       ${note ? `<div class="ps-note">⚠️ ${note}</div>` : ''}
+    </div>
+    <div class="ps-card tp-card">
+      <div class="ps-title">Allures d'entraînement — palier <strong>${LEVELS[target].name}</strong></div>
+      ${paceRows}
+      <div class="tp-race">🏁 Allure à tenir le jour du Hyrox : <strong>${fmtMMSS(pc.race)}/km</strong>
+        <span>sur les 8 km, jambes fatiguées — soit ${fmtHMS(pc.race * 8)} de course cumulée.</span></div>
     </div>`;
 }
 
@@ -1730,6 +1776,15 @@ function renderPlanCards() {
       </div>`;
     }
 
+    let extra = '';
+    if (s.kind === 'course' && s.paceSec) {
+      const km = s.items[0].value || 0;
+      extra = `<div class="pc-pace">
+        <span>🎯 Allure cible <strong>${fmtMMSS(s.paceSec)}/km</strong></span>
+        <span>⏱️ ~${fmtHMS(km * s.paceSec)}</span>
+      </div>`;
+    }
+
     const card = document.createElement('div');
     card.className = 'plan-card ' + s.kind;
     card.innerHTML = `
@@ -1748,6 +1803,7 @@ function renderPlanCards() {
       </div>
       ${typeSel}
       <ul class="pc-list">${items}</ul>
+      ${extra}
       <div class="pc-tip">${s.tip}</div>`;
 
     card.querySelectorAll('.pc-edit input').forEach((inp) => {
@@ -1790,6 +1846,7 @@ function renderPlanCards() {
         sess.tip = prof.tip;
         sess.charge = CHARGE[prof.name] || 6;
         sess.cap = prof.cap != null ? prof.cap : null;
+        sess.paceSec = trainingPaces(PLAN_STATE.target)[PACE_KIND[prof.name] || 'ef'];
         if (sess.cap != null && sess.items[0].value > sess.cap) {
           sess.items[0].value = sess.cap;
           toast(`⚠️ Distance ramenée à ${sess.cap} km (plafond fractionné)`);
@@ -1969,7 +2026,8 @@ function renderCalendar() {
             <span class="cs-rpe">${escapeHtml(s.rpe)}</span>
           </div>
           <div class="cs-items">${s.items.map((it) =>
-            `<span class="cs-item">${it.emoji} ${it.isTime ? fmtSeconds(it.value) : it.value + ' ' + it.unit}</span>`).join('')}</div>
+            `<span class="cs-item">${it.emoji} ${it.isTime ? fmtSeconds(it.value) : it.value + ' ' + it.unit}</span>`).join('')}
+            ${s.paceSec ? `<span class="cs-item cs-pace">🎯 ${fmtMMSS(s.paceSec)}/km</span>` : ''}</div>
         </div>`).join('');
     }
     row.innerHTML = inner;
@@ -2022,23 +2080,38 @@ initPlanUI();
    ------------------------------------------------------------------------- */
 const SIM_KEY = 'hyrox-sim-v1';
 
+/* Temps de station par palier, dans l'ordre des niveaux de l'app :
+   [paresseux, motivé, de compétition, survolté, de guerre, d'élite] */
 const HYROX_STATIONS = [
-  { name: 'SkiErg',            detail: '1000 m',    emoji: '🎿', t: [225, 270, 300, 360] },
-  { name: 'Sled Push',         detail: '50 m',      emoji: '🛷', t: [120, 180, 240, 330] },
-  { name: 'Sled Pull',         detail: '50 m',      emoji: '🪢', t: [150, 210, 270, 360] },
-  { name: 'Burpee Broad Jump', detail: '80 m',      emoji: '🤸', t: [210, 300, 390, 540] },
-  { name: 'Rowing',            detail: '1000 m',    emoji: '🚣', t: [220, 260, 300, 360] },
-  { name: 'Farmers Carry',     detail: '200 m',     emoji: '🧳', t: [105, 135, 165, 210] },
-  { name: 'Sandbag Lunges',    detail: '100 m',     emoji: '🎒', t: [200, 270, 330, 420] },
-  { name: 'Wall Balls',        detail: '100 reps',  emoji: '🏐', t: [240, 330, 420, 540] },
+  { name: 'SkiErg',            detail: '1000 m',   emoji: '🎿', t: [390, 345, 300, 260, 240, 225] },
+  { name: 'Sled Push',         detail: '50 m',     emoji: '🛷', t: [360, 300, 240, 180, 140, 120] },
+  { name: 'Sled Pull',         detail: '50 m',     emoji: '🪢', t: [390, 330, 270, 210, 170, 150] },
+  { name: 'Burpee Broad Jump', detail: '80 m',     emoji: '🤸', t: [570, 450, 360, 280, 240, 210] },
+  { name: 'Rowing',            detail: '1000 m',   emoji: '🚣', t: [360, 320, 280, 250, 230, 220] },
+  { name: 'Farmers Carry',     detail: '200 m',    emoji: '🧳', t: [240, 195, 160, 130, 115, 105] },
+  { name: 'Sandbag Lunges',    detail: '100 m',    emoji: '🎒', t: [450, 375, 300, 240, 210, 200] },
+  { name: 'Wall Balls',        detail: '100 reps', emoji: '🏐', t: [570, 450, 360, 280, 240, 210] },
 ];
 
+/* Un profil par palier de l'app. L'allure de course est l'allure tenue EN COURSE
+   (jambes fatiguées, virages, foule) — bien plus lente qu'un 8 km à froid. */
 const SIM_PRESETS = [
-  { name: 'Élite (~1 h 00)',          idx: 0, pace: 255, rox: 20 },
-  { name: 'Compétiteur (~1 h 15)',    idx: 1, pace: 300, rox: 30 },
-  { name: 'Intermédiaire (~1 h 30)',  idx: 2, pace: 345, rox: 40 },
-  { name: 'Découverte (~1 h 50)',     idx: 3, pace: 405, rox: 60 },
+  { level: 1, pace: RACE_PACE[1], rox: 70 },
+  { level: 2, pace: RACE_PACE[2], rox: 55 },
+  { level: 3, pace: RACE_PACE[3], rox: 45 },
+  { level: 4, pace: RACE_PACE[4], rox: 35 },
+  { level: 5, pace: RACE_PACE[5], rox: 25 },
+  { level: 6, pace: RACE_PACE[6], rox: 20 },
 ];
+
+/** Chrono de référence d'un profil (sert aussi à étiqueter le menu). */
+function presetTotal(i) {
+  const p = SIM_PRESETS[i];
+  return p.pace * 8 + HYROX_STATIONS.reduce((s, st) => s + st.t[i], 0) + p.rox * 8;
+}
+function presetLabel(i) {
+  return `${LEVELS[SIM_PRESETS[i].level].name} — ${fmtHMS(presetTotal(i))}`;
+}
 
 /** Accepte "5:30", "5 30", "330" (=330 s) ou "5.30" et renvoie des secondes. */
 function parseTime(str) {
@@ -2065,15 +2138,15 @@ function fmtHMS(sec) {
 
 let SIM = null;
 function simDefaults(presetIdx) {
-  // Attention : l'index 0 (Élite) est falsy — on borne explicitement.
+  // Attention : l'index 0 est falsy — on borne explicitement.
   let i = parseInt(presetIdx, 10);
-  if (isNaN(i)) i = 1;
+  if (isNaN(i)) i = 2;
   i = Math.max(0, Math.min(SIM_PRESETS.length - 1, i));
   const p = SIM_PRESETS[i];
   return {
     preset: i,
     runs: new Array(8).fill(p.pace),
-    stations: HYROX_STATIONS.map((s) => s.t[p.idx]),
+    stations: HYROX_STATIONS.map((s) => s.t[i]),
     rox: p.rox,
   };
 }
@@ -2082,16 +2155,21 @@ function loadSim() {
     const s = JSON.parse(localStorage.getItem(SIM_KEY));
     if (s && Array.isArray(s.runs) && s.runs.length === 8 && Array.isArray(s.stations) && s.stations.length === 8) return s;
   } catch (e) { /* ignore */ }
-  return simDefaults(1);
+  return simDefaults(2);
 }
 function saveSim() { try { localStorage.setItem(SIM_KEY, JSON.stringify(SIM)); } catch (e) {} }
 
+/* Le verdict reprend les paliers de l'app : on renvoie le meilleur palier
+   dont le chrono de référence n'est pas battu par le total simulé. */
+const VERDICT_DOT = ['#ffd43b', '#51cf66', '#339af0', '#fa5252', '#b8aaff', '#d4fb2e'];
 function simVerdict(total) {
-  if (total <= 0) return { label: '—', cls: '' };
-  if (total < 3900) return { label: '🔥 Niveau élite', cls: 'v-elite' };
-  if (total < 4800) return { label: '💪 Niveau compétiteur', cls: 'v-comp' };
-  if (total < 5700) return { label: '⚡ Niveau intermédiaire', cls: 'v-inter' };
-  return { label: '🚀 Niveau découverte', cls: 'v-dec' };
+  if (total <= 0) return { label: '—', dot: 'var(--muted)' };
+  for (let i = SIM_PRESETS.length - 1; i >= 0; i--) {
+    if (total <= presetTotal(i)) {
+      return { label: 'Niveau ' + LEVELS[SIM_PRESETS[i].level].name, dot: VERDICT_DOT[i] };
+    }
+  }
+  return { label: 'En construction — vise le palier paresseux', dot: 'var(--muted)' };
 }
 
 function renderSim() {
@@ -2103,9 +2181,8 @@ function renderSim() {
 
   document.getElementById('simTotal').textContent = fmtHMS(total);
   const v = simVerdict(total);
-  const verdict = document.getElementById('simVerdict');
-  verdict.textContent = v.label;
-  verdict.className = 'sim-verdict ' + v.cls;
+  document.getElementById('simVerdict').innerHTML =
+    `<span class="v-dot" style="background:${v.dot}"></span>${escapeHtml(v.label)}`;
 
   document.getElementById('simBar').innerHTML = `
     <div class="sb-seg sb-run" style="width:${pct(totalRun)}%"></div>
@@ -2173,12 +2250,12 @@ function renderSim() {
 function initSim() {
   SIM = loadSim();
   const sel = document.getElementById('simPreset');
-  sel.innerHTML = SIM_PRESETS.map((p, i) => `<option value="${i}">${p.name}</option>`).join('');
-  sel.value = SIM.preset != null ? SIM.preset : 1;
+  sel.innerHTML = SIM_PRESETS.map((p, i) => `<option value="${i}">${presetLabel(i)}</option>`).join('');
+  sel.value = SIM.preset != null ? SIM.preset : 2;
   sel.addEventListener('change', () => {
     SIM = simDefaults(parseInt(sel.value, 10));
     saveSim(); renderSim();
-    toast(`🏁 Profil « ${SIM_PRESETS[SIM.preset].name} » chargé`);
+    toast(`🏁 Profil « ${LEVELS[SIM_PRESETS[SIM.preset].level].name} » chargé`);
   });
   document.getElementById('simRox').addEventListener('change', (e) => {
     SIM.rox = parseTime(e.target.value); saveSim(); renderSim();

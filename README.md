@@ -26,6 +26,9 @@ des semaines passées et met en avant tes **records all-time**.
   compare en direct ce qui est programmé à l'objectif visé.
   Le **fractionné est plafonné à 4 km** par séance (prévention des blessures) : le surplus de
   kilométrage est automatiquement redistribué sur les autres sorties.
+- **Allures d'entraînement** : selon le palier visé, l'app donne l'allure d'**EF**, de **seuil** et de
+  **fractionné**, ainsi que l'**allure à tenir le jour du Hyrox**. Chaque carte de course affiche son
+  allure cible et la durée estimée de la séance.
 - **Plans enregistrés** : sauvegarde un plan une fois ajusté et recharge-le en un clic les semaines suivantes.
 - **Agenda** (bouton en haut à droite) : le plan adopté s'y affiche jour par jour (avec le jour du jour mis
   en avant), et un bouton permet de **vider le plan de la semaine** pour en choisir un autre.
@@ -38,8 +41,9 @@ des semaines passées et met en avant tes **records all-time**.
   plus la **roxzone** (transitions). Tu saisis chaque temps au format `mm:ss` (la saisie est tolérante :
   `225` ou `3.45` valent aussi 3:45), et l'app calcule ton **chrono simulé** en direct, avec le **cumul par
   bloc**, la **répartition course / stations / roxzone**, ton allure moyenne et tes stations les plus
-  lentes/rapides. Quatre **profils de départ** (Élite ~1 h 00 · Compétiteur ~1 h 15 · Intermédiaire ~1 h 30 ·
-  Découverte ~1 h 50) préremplissent des temps réalistes.
+  lentes/rapides. **Six profils de départ** correspondant aux paliers de l'app (Paresseux ~2 h 05 ·
+  Motivé ~1 h 47 · De compétition ~1 h 32 · Survolté ~1 h 17 · De guerre ~1 h 07 · D'élite ~1 h 00)
+  préremplissent des temps réalistes, et le verdict te situe sur ces mêmes paliers.
 - **Réinitialisation automatique chaque lundi** (semaine ISO). Le volume de la semaine écoulée est archivé.
 - **Historique consultable** de chaque semaine passée, avec le titre atteint dans chaque catégorie.
 - **Bourse 📈** (onglet *Historique*) : l'évolution hebdomadaire de chaque exercice depuis la première
