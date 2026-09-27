@@ -239,6 +239,7 @@
         <div class="seg" id="histSeg">
           <button class="seg-btn active" data-view="weeks" type="button">Semaines</button>
           <button class="seg-btn" data-view="alltime" type="button">All-time 👑</button>
+          <button class="seg-btn" data-view="bourse" type="button">Bourse 📈</button>
         </div>
 
         <div id="histWeeksView">
@@ -253,6 +254,12 @@
             <p class="muted">Le plus haut volume atteint sur la semaine en cours ou passée.</p></div>
           <div id="allTime" class="alltime-grid"></div>
         </div>
+
+        <div id="histBourseView" class="hidden">
+          <div class="panel-head"><h2>Bourse 📈</h2>
+            <p class="muted">L'évolution de chaque exercice, semaine après semaine, depuis ta première semaine d'activité.</p></div>
+          <div id="bourse" class="bourse"></div>
+        </div>
       </div>
 
       <div class="footer">
@@ -261,16 +268,49 @@
       </div>
     </section>
 
-    <!-- ===================== PAGE : STORY JOURNAL ===================== -->
-    <section class="page" id="page-journal" data-page="journal">
+    <!-- ===================== PAGE : SIMULATEUR HYROX ===================== -->
+    <section class="page" id="page-hyrox" data-page="hyrox">
+      <div class="sim-hero">
+        <div class="sim-hero-label">Chrono simulé</div>
+        <div class="sim-total" id="simTotal">--:--:--</div>
+        <div class="sim-verdict" id="simVerdict"></div>
+        <div class="sim-bar" id="simBar"></div>
+        <div class="sim-legend" id="simLegend"></div>
+      </div>
+
       <div class="panel">
         <div class="panel-head">
-          <h2>Story Journal</h2>
-          <p class="muted">Tes séances marquantes, en photos.</p>
+          <h2>Réglages</h2>
+          <p class="muted">Pars d'un profil type, puis ajuste chaque temps. Format <em>mm:ss</em>.</p>
         </div>
-        <button id="newStoryBtn" class="btn-volt add-week-btn" type="button">＋ Nouvelle story</button>
-        <div id="storyGrid" class="story-grid"></div>
-        <p id="storyEmpty" class="empty sj-empty">Aucune story pour l'instant. Ajoute ta première séance marquante ✦</p>
+        <label class="field-label" for="simPreset">Profil de départ</label>
+        <select id="simPreset" class="field"></select>
+        <div class="sim-cfg">
+          <label>Allure / km
+            <input id="simPace" type="text" inputmode="numeric" placeholder="5:00" />
+          </label>
+          <label>Roxzone / transition
+            <input id="simRox" type="text" inputmode="numeric" placeholder="0:30" />
+          </label>
+        </div>
+        <button id="simApplyPace" class="ghost-btn sim-apply" type="button">↻ Appliquer l'allure aux 8 km</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Les 8 blocs</h2>
+          <p class="muted">1 km de course puis une station, huit fois — l'ordre officiel Hyrox.</p>
+        </div>
+        <div id="simRows" class="sim-rows"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>Analyse</h2></div>
+        <div id="simStats" class="sim-stats"></div>
+      </div>
+
+      <div class="footer">
+        <button id="simReset" class="ghost-btn" type="button">Réinitialiser le simulateur</button>
       </div>
     </section>
 
@@ -292,32 +332,6 @@
       </div>
     </div>
 
-    <!-- Éditeur de story -->
-    <div id="storyEditor" class="modal hidden">
-      <div class="modal-card">
-        <h3 id="storyEditorTitle">Nouvelle story</h3>
-        <label class="field-label" for="storyTitleInput">Titre</label>
-        <input id="storyTitleInput" class="field" type="text" maxlength="80" placeholder="Ex. PR gainage 15 min 🔥" />
-        <label class="field-label" for="storyDateInput">Date</label>
-        <input id="storyDateInput" class="field" type="date" />
-        <label class="field-label" for="storyDescInput">Description</label>
-        <textarea id="storyDescInput" class="field" rows="4" maxlength="600" placeholder="Raconte ta séance…"></textarea>
-        <label class="field-label">Photos</label>
-        <div id="storyPhotos" class="story-photos"></div>
-        <label class="photo-add">
-          <input id="storyPhotoInput" type="file" accept="image/*" multiple hidden />
-          <span>＋ Ajouter des photos</span>
-        </label>
-        <p id="storyQuota" class="quota-msg hidden"></p>
-        <div class="modal-actions">
-          <button id="storyDeleteBtn" class="ghost-btn danger hidden" type="button">Supprimer</button>
-          <span class="spacer"></span>
-          <button id="storyCancelBtn" class="ghost-btn" type="button">Annuler</button>
-          <button id="storySaveBtn" class="btn-volt" type="button">Enregistrer</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Éditeur de semaine (historique) -->
     <div id="weekEditor" class="modal hidden">
       <div class="modal-card">
@@ -333,12 +347,6 @@
           <button id="weekSaveBtn" class="btn-volt" type="button">Enregistrer</button>
         </div>
       </div>
-    </div>
-
-    <!-- Lightbox photo -->
-    <div id="lightbox" class="lightbox hidden">
-      <button id="lightboxClose" class="lightbox-close" type="button" aria-label="Fermer">✕</button>
-      <img id="lightboxImg" alt="" />
     </div>
 
     <!-- ===================== BOTTOM TAB BAR ===================== -->
@@ -363,9 +371,9 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 8v4l3 2"/></svg>
         <span>Histo</span>
       </button>
-      <button class="tab" data-tab="journal" type="button">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H18a2 2 0 0 1 2 2v13a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V5.5Z"/><path d="M8 4v16"/></svg>
-        <span>Journal</span>
+      <button class="tab" data-tab="hyrox" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V3.5M5 4.5h12.5l-2.2 3.8 2.2 3.8H5"/></svg>
+        <span>Simu</span>
       </button>
     </nav>
   </div>

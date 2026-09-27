@@ -9,7 +9,7 @@ des semaines passées et met en avant tes **records all-time**.
 - **Saisie hebdomadaire** de ton volume pour 5 catégories : Burpees, Wallballs, Fentes chargées, Course, Gainage.
   Le total de chaque exercice est **éditable** (bouton **Sauvegarder**), avec des ajouts
   rapides (+5 / +10 / …) et un bouton **Remise à zéro** par exercice.
-- **Navigation par barre d'onglets en bas** : `Semaine · Progrès · Plan · Timer · Historique · Journal`,
+- **Navigation par barre d'onglets en bas** : `Semaine · Progrès · Plan · Timer · Historique · Simu`,
   plus un bouton **Agenda** en haut à droite.
 - **Timer** : chronomètre (avec tours), minuteur (compte à rebours, **presets enregistrables**) et
   **entraînement par intervalles** personnalisable (préparation / effort / repos / tours) avec
@@ -34,11 +34,17 @@ des semaines passées et met en avant tes **records all-time**.
 - **Historique éditable** : modifie le volume d'une semaine passée, supprime-la, ou **ajoute une semaine
   oubliée** (choix de la semaine ISO) — les records se recalculent automatiquement.
 - **Compte à rebours en direct** vers le prochain lundi 00:00, au format `Xj HH:MM:SS`.
-- **Story Journal** (onglet *Journal*) : une galerie mosaïque de tes séances marquantes
-  (titre, **date**, description, plusieurs photos, lightbox plein écran). **Sans champ prix.**
-  Photos redimensionnées dans le navigateur (max 1200 px) et stockées à part.
+- **Simulateur de course Hyrox** (onglet *Simu*) : le format officiel — 8 × (1 km de course + 1 station),
+  plus la **roxzone** (transitions). Tu saisis chaque temps au format `mm:ss` (la saisie est tolérante :
+  `225` ou `3.45` valent aussi 3:45), et l'app calcule ton **chrono simulé** en direct, avec le **cumul par
+  bloc**, la **répartition course / stations / roxzone**, ton allure moyenne et tes stations les plus
+  lentes/rapides. Quatre **profils de départ** (Élite ~1 h 00 · Compétiteur ~1 h 15 · Intermédiaire ~1 h 30 ·
+  Découverte ~1 h 50) préremplissent des temps réalistes.
 - **Réinitialisation automatique chaque lundi** (semaine ISO). Le volume de la semaine écoulée est archivé.
 - **Historique consultable** de chaque semaine passée, avec le titre atteint dans chaque catégorie.
+- **Bourse 📈** (onglet *Historique*) : l'évolution hebdomadaire de chaque exercice depuis la première
+  semaine d'activité, en courbes façon cours de bourse — valeur actuelle, variation vs semaine précédente
+  (▲ vert / ▼ rouge, en absolu et en %) et ligne de record en pointillés.
 - **Records all-time** par catégorie : recalculés comme le **plus haut volume atteint** sur toutes les
   semaines connues (semaine en cours **ou** semaines passées), donc toujours justes même après un écrasement.
 - **Titres gamifiés** débloqués (et re-débloqués chaque semaine) selon le volume réalisé :
@@ -84,12 +90,13 @@ donc parfaitement sous le sous-chemin `/Hyrox-app/`.
 ## 🗂️ Structure
 
 ```
-index.html            # pages à onglets, barre de navigation, story journal, lightbox
+index.html            # pages à onglets, barre de navigation, agenda, simulateur
 styles.css            # thème Hyrox (noir + volt), badges, radar, jauges, journal
-app.js                # paliers, titres, semaine ISO, radar, story journal, localStorage
+app.js                # paliers, titres, semaine ISO, radar, plan, bourse, simulateur
 logo.png              # logo de l'app (en-tête) — à déposer ici
 icon-192/512.png      # icônes favicon + PWA (dérivées de logo.png)
 manifest.webmanifest  # métadonnées PWA (icône au téléchargement/installation)
+sw.js                 # service worker (mise à jour auto + hors-ligne)
 netlify.toml          # config Netlify (site statique, publish = ".")
 ```
 
@@ -102,7 +109,7 @@ typographie athlétique en capitales italiques, icônes ligne. Les 7 couleurs de
 ## 💾 Données (localStorage)
 
 - `hyrox-journal-v1` — quest hebdomadaire (semaine en cours, historique, records).
-- `hyrox-journal-stories-v1` — story journal (indépendant du quest).
+- `hyrox-sim-v1` — temps saisis dans le simulateur Hyrox.
 - `hyrox-timer-presets-v1` / `hyrox-timer-min-presets-v1` — presets d'intervalles et de minuteur.
 - `hyrox-plan-v1` — réglages du plan (objectif + nombre de séances).
 - `hyrox-week-plan-v1` — plan adopté pour la semaine (agenda).

@@ -757,241 +757,140 @@ document.querySelectorAll('.tab').forEach((t) => {
   t.addEventListener('click', () => switchTab(t.dataset.tab));
 });
 
-/* Sélecteur segmenté de l'historique (Semaines / All-time) */
+/* Sélecteur segmenté de l'historique (Semaines / All-time / Bourse) */
+const HIST_VIEWS = { weeks: 'histWeeksView', alltime: 'histAllTimeView', bourse: 'histBourseView' };
 document.querySelectorAll('#histSeg .seg-btn').forEach((b) => {
   b.addEventListener('click', () => {
     document.querySelectorAll('#histSeg .seg-btn').forEach((x) => x.classList.toggle('active', x === b));
-    const alltime = b.dataset.view === 'alltime';
-    document.getElementById('histWeeksView').classList.toggle('hidden', alltime);
-    document.getElementById('histAllTimeView').classList.toggle('hidden', !alltime);
+    const view = b.dataset.view;
+    Object.keys(HIST_VIEWS).forEach((k) => {
+      document.getElementById(HIST_VIEWS[k]).classList.toggle('hidden', k !== view);
+    });
+    if (view === 'bourse') renderBourse();
   });
 });
 
 /* -------------------------------------------------------------------------
-   9. Story Journal (galerie de séances marquantes, sans prix)
+   9bis. Bourse : évolution hebdomadaire de chaque exercice
    ------------------------------------------------------------------------- */
-const STORY_KEY = 'hyrox-journal-stories-v1';
-let STORIES = loadStories();
-let editingStoryId = null;
-let draftPhotos = [];
 
-function loadStories() {
-  try {
-    const arr = JSON.parse(localStorage.getItem(STORY_KEY));
-    return Array.isArray(arr) ? arr : [];
-  } catch (e) { return []; }
+/** Série chronologique : toutes les semaines connues, la plus ancienne d'abord. */
+function buildSeries() {
+  const map = {};
+  STATE.history.forEach((h) => { map[h.week] = h.values || {}; });
+  map[STATE.currentWeek] = STATE.current;
+  return Object.keys(map).sort().map((w) => ({ week: w, values: map[w] }));
 }
-function saveStories() {
-  try {
-    localStorage.setItem(STORY_KEY, JSON.stringify(STORIES));
-    return true;
-  } catch (e) {
-    return false; // quota dépassé
+
+/** Libellé court d'une semaine ISO : "2026-W32" -> "W32". */
+function shortWeek(key) {
+  const m = /^(\d{4})-W(\d{2})$/.exec(key);
+  return m ? 'W' + parseInt(m[2], 10) : key;
+}
+
+/** Courbe SVG façon cours de bourse pour une série de valeurs. */
+function bourseChart(values, weeks, ex, uid) {
+  const W = 320, H = 104, padL = 6, padR = 6, padT = 12, padB = 20;
+  const n = values.length;
+  const max = Math.max.apply(null, values.concat([1]));
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const x = (i) => (n === 1 ? W / 2 : padL + i * innerW / (n - 1));
+  const y = (v) => padT + innerH - (v / max) * innerH;
+  const base = padT + innerH;
+
+  const pts = values.map((v, i) => [x(i), y(v)]);
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const area = n === 1 ? '' :
+    `M${pts[0][0].toFixed(1)} ${base} ` + pts.map((p) => `L${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ') +
+    ` L${pts[n - 1][0].toFixed(1)} ${base} Z`;
+
+  const recordY = y(max);
+  const last = pts[n - 1];
+  const grid = [0.25, 0.5, 0.75].map((f) =>
+    `<line x1="${padL}" x2="${W - padR}" y1="${(padT + innerH * f).toFixed(1)}" y2="${(padT + innerH * f).toFixed(1)}" class="bc-grid"/>`).join('');
+
+  return `<svg viewBox="0 0 ${W} ${H}" class="bc-svg" role="img" aria-label="Évolution ${ex.name}">
+    <defs><linearGradient id="bg${uid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--volt)" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="var(--volt)" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${grid}
+    <line x1="${padL}" x2="${W - padR}" y1="${recordY.toFixed(1)}" y2="${recordY.toFixed(1)}" class="bc-record"/>
+    ${area ? `<path d="${area}" fill="url(#bg${uid})"/>` : ''}
+    ${n > 1 ? `<path d="${line}" class="bc-line"/>` : ''}
+    ${pts.map((p, i) => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${i === n - 1 ? 4 : 2.3}" class="${i === n - 1 ? 'bc-dot-last' : 'bc-dot'}"/>`).join('')}
+    <text x="${padL}" y="${H - 5}" class="bc-x">${shortWeek(weeks[0])}</text>
+    ${n > 1 ? `<text x="${W - padR}" y="${H - 5}" text-anchor="end" class="bc-x">${shortWeek(weeks[n - 1])}</text>` : ''}
+    <text x="${Math.min(last[0], W - padR).toFixed(1)}" y="${Math.max(padT - 3, last[1] - 8).toFixed(1)}" text-anchor="${n === 1 ? 'middle' : 'end'}" class="bc-lastval">${ex.id === 'gainage' ? fmtSeconds(values[n - 1]) : fmt(ex, values[n - 1])}</text>
+  </svg>`;
+}
+
+function renderBourse() {
+  const host = document.getElementById('bourse');
+  const series = buildSeries();
+  host.innerHTML = '';
+
+  const active = series.filter((p) => EXERCISES.some((ex) => (p.values[ex.id] || 0) > 0));
+  if (!active.length) {
+    host.innerHTML = `<p class="empty" style="text-align:center;padding:30px 10px;line-height:1.6">
+      Aucune activité enregistrée pour l'instant.<br>Saisis ton volume dans l'onglet <strong>Semaine</strong>
+      et ta courbe apparaîtra ici.</p>`;
+    return;
   }
-}
-function storyId() {
-  // identifiant sans Date.now()/Math.random() : basé sur le max existant
-  const max = STORIES.reduce((m, s) => Math.max(m, s.id || 0), 0);
-  return max + 1;
-}
-function fmtStoryDate(val) {
-  if (!val) return '';
-  let d;
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(val);
-  if (m) d = new Date(+m[1], +m[2] - 1, +m[3]); // date locale, pas de décalage UTC
-  else d = new Date(val);
-  if (isNaN(d)) return '';
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
-}
 
-/** Date du jour au format "YYYY-MM-DD" (local). */
-function todayISODate() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
+  const weeks = series.map((p) => p.week);
+  EXERCISES.forEach((ex, idx) => {
+    const values = series.map((p) => p.values[ex.id] || 0);
+    const n = values.length;
+    const last = values[n - 1];
+    const prev = n > 1 ? values[n - 2] : null;
+    const peak = Math.max.apply(null, values);
+    const fmtV = (v) => (ex.id === 'gainage' ? fmtSeconds(v) : `${fmt(ex, v)} ${ex.unit}`);
 
-/** Clé de tri d'une story (date renseignée sinon date de création). */
-function storyDateKey(s) {
-  return s.date || (s.created ? s.created.slice(0, 10) : '');
-}
+    let delta = '<span class="bd-flat">— première semaine</span>';
+    if (prev !== null) {
+      const d = last - prev;
+      if (d === 0) delta = '<span class="bd-flat">= stable</span>';
+      else {
+        const pct = prev > 0 ? ` (${d > 0 ? '+' : ''}${Math.round(d / prev * 100)} %)` : '';
+        delta = `<span class="${d > 0 ? 'bd-up' : 'bd-down'}">${d > 0 ? '▲' : '▼'} ${d > 0 ? '+' : '−'}${fmtV(Math.abs(d))}${pct}</span>`;
+      }
+    }
 
-function renderStories() {
-  const grid = document.getElementById('storyGrid');
-  const empty = document.getElementById('storyEmpty');
-  grid.innerHTML = '';
-  empty.classList.toggle('hidden', STORIES.length > 0);
-
-  // Affichage trié par date (la plus récente en tête)
-  const ordered = STORIES.slice().sort((a, b) => storyDateKey(b).localeCompare(storyDateKey(a)));
-
-  ordered.forEach((s) => {
     const card = document.createElement('div');
-    card.className = 'story-card';
-    const cover = (s.photos && s.photos[0]) || null;
-    const count = s.photos ? s.photos.length : 0;
-    const dateTxt = fmtStoryDate(s.date || s.created);
+    card.className = 'bourse-card';
     card.innerHTML = `
-      <div class="story-cover">
-        ${cover ? `<img src="${cover}" alt="" />` : '<div class="no-photo">✦</div>'}
-        ${count > 1 ? `<span class="story-count">${count} photos</span>` : ''}
+      <div class="bo-head">
+        <div class="bo-id"><span class="bo-emoji">${ex.emoji}</span>
+          <div><div class="bo-name">${ex.name}</div><div class="bo-sub">${n} sem. · record ${fmtV(peak)} 👑</div></div>
+        </div>
+        <div class="bo-now"><div class="bo-val">${fmtV(last)}</div><div class="bo-delta">${delta}</div></div>
       </div>
-      <div class="story-body">
-        <p class="story-title">${escapeHtml(s.title || 'Sans titre')}</p>
-        ${s.desc ? `<p class="story-desc">${escapeHtml(s.desc)}</p>` : ''}
-        ${dateTxt ? `<div class="story-date">🗓️ ${dateTxt}</div>` : ''}
-      </div>
-    `;
-    card.addEventListener('click', () => openStoryEditor(s.id));
-    grid.appendChild(card);
+      ${bourseChart(values, weeks, ex, idx)}`;
+    host.appendChild(card);
   });
 }
 
+/* -------------------------------------------------------------------------
+   9. Utilitaires partagés
+   ------------------------------------------------------------------------- */
 function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
 }
 
-/* ---- Éditeur ---- */
-function openStoryEditor(id) {
-  editingStoryId = id != null ? id : null;
-  const s = editingStoryId != null ? STORIES.find((x) => x.id === editingStoryId) : null;
-  document.getElementById('storyEditorTitle').textContent = s ? 'Modifier la story' : 'Nouvelle story';
-  document.getElementById('storyTitleInput').value = s ? (s.title || '') : '';
-  document.getElementById('storyDateInput').value = s ? (s.date || (s.created ? s.created.slice(0, 10) : '')) : todayISODate();
-  document.getElementById('storyDescInput').value = s ? (s.desc || '') : '';
-  draftPhotos = s && s.photos ? s.photos.slice() : [];
-  document.getElementById('storyDeleteBtn').classList.toggle('hidden', !s);
-  document.getElementById('storyQuota').classList.add('hidden');
-  renderDraftPhotos();
-  document.getElementById('storyEditor').classList.remove('hidden');
-}
-function closeStoryEditor() {
-  document.getElementById('storyEditor').classList.add('hidden');
-  editingStoryId = null;
-  draftPhotos = [];
-}
-function renderDraftPhotos() {
-  const host = document.getElementById('storyPhotos');
-  host.innerHTML = '';
-  draftPhotos.forEach((src, i) => {
-    const t = document.createElement('div');
-    t.className = 'sp-thumb';
-    t.innerHTML = `<img src="${src}" alt="" /><button type="button" aria-label="Retirer">✕</button>`;
-    t.querySelector('img').addEventListener('click', () => openLightbox(src));
-    t.querySelector('button').addEventListener('click', (e) => {
-      e.stopPropagation();
-      draftPhotos.splice(i, 1);
-      renderDraftPhotos();
-    });
-    host.appendChild(t);
-  });
-}
-
-/** Redimensionne une image (max 1200 px, JPEG 0.72) avant stockage. */
-function resizePhoto(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const max = 1200;
-        let { width, height } = img;
-        if (width > max || height > max) {
-          if (width >= height) { height = Math.round(height * max / width); width = max; }
-          else { width = Math.round(width * max / height); height = max; }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.72));
-      };
-      img.onerror = reject;
-      img.src = reader.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-document.getElementById('storyPhotoInput').addEventListener('change', async (e) => {
-  const files = Array.from(e.target.files || []);
-  for (const f of files) {
-    try { draftPhotos.push(await resizePhoto(f)); }
-    catch (err) { /* ignore fichier illisible */ }
-  }
-  e.target.value = '';
-  renderDraftPhotos();
-});
-
-document.getElementById('newStoryBtn').addEventListener('click', () => openStoryEditor(null));
-document.getElementById('storyCancelBtn').addEventListener('click', closeStoryEditor);
-document.getElementById('storySaveBtn').addEventListener('click', () => {
-  const title = document.getElementById('storyTitleInput').value.trim();
-  const desc = document.getElementById('storyDescInput').value.trim();
-  const date = document.getElementById('storyDateInput').value || todayISODate();
-  if (!title && !desc && draftPhotos.length === 0) { closeStoryEditor(); return; }
-
-  if (editingStoryId != null) {
-    const s = STORIES.find((x) => x.id === editingStoryId);
-    if (s) { s.title = title; s.desc = desc; s.date = date; s.photos = draftPhotos.slice(); }
-  } else {
-    STORIES.unshift({ id: storyId(), title, date, desc, photos: draftPhotos.slice(), created: new Date().toISOString() });
-  }
-
-  if (!saveStories()) {
-    document.getElementById('storyQuota').textContent =
-      "Stockage plein : réduis le nombre de photos et réessaie.";
-    document.getElementById('storyQuota').classList.remove('hidden');
-    // on annule l'ajout non persistable
-    STORIES = loadStories();
-    return;
-  }
-  renderStories();
-  closeStoryEditor();
-  toast('📖 Story enregistrée');
-});
-document.getElementById('storyDeleteBtn').addEventListener('click', () => {
-  if (editingStoryId == null) return;
-  if (!confirm('Supprimer cette story ?')) return;
-  STORIES = STORIES.filter((x) => x.id !== editingStoryId);
-  saveStories();
-  renderStories();
-  closeStoryEditor();
-  toast('🗑️ Story supprimée');
-});
-
-/* ---- Lightbox ---- */
-function openLightbox(src) {
-  document.getElementById('lightboxImg').src = src;
-  document.getElementById('lightbox').classList.remove('hidden');
-}
-function closeLightbox() {
-  document.getElementById('lightbox').classList.add('hidden');
-  document.getElementById('lightboxImg').src = '';
-}
-document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
-document.getElementById('lightbox').addEventListener('click', (e) => {
-  if (e.target.id === 'lightbox') closeLightbox();
-});
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  if (!document.getElementById('lightbox').classList.contains('hidden')) { closeLightbox(); return; }
-  if (!document.getElementById('storyEditor').classList.contains('hidden')) { closeStoryEditor(); return; }
   if (!document.getElementById('weekEditor').classList.contains('hidden')) { closeWeekEditor(); return; }
   if (!document.getElementById('calendarView').classList.contains('hidden')) { toggleCalendar(false); }
 });
-
-/* Le Story Journal est désormais un onglet : il se rend au chargement. */
-renderStories();
 
 /* -------------------------------------------------------------------------
    10. Réinitialisation globale
    ------------------------------------------------------------------------- */
 document.getElementById('resetAllBtn').addEventListener('click', () => {
-  if (!confirm('Effacer TOUTES les données du quest (semaine, historique, records) ? Le story journal n\'est pas touché. Action irréversible.')) return;
+  if (!confirm('Effacer TOUTES les données du quest (semaine, historique, records) ? Les plans enregistrés ne sont pas touchés. Action irréversible.')) return;
   localStorage.removeItem(STORAGE_KEY);
   STATE = loadState();
   ensureCurrentWeek(STATE);
@@ -2115,6 +2014,191 @@ function initPlanUI() {
   if (saved.generated) generatePlan();
 }
 initPlanUI();
+
+/* -------------------------------------------------------------------------
+   14bis. Simulateur de course Hyrox
+   Format officiel : 8 × (1 km de course + 1 station), plus le temps de
+   transition (roxzone) entre chaque bloc.
+   ------------------------------------------------------------------------- */
+const SIM_KEY = 'hyrox-sim-v1';
+
+const HYROX_STATIONS = [
+  { name: 'SkiErg',            detail: '1000 m',    emoji: '🎿', t: [225, 270, 300, 360] },
+  { name: 'Sled Push',         detail: '50 m',      emoji: '🛷', t: [120, 180, 240, 330] },
+  { name: 'Sled Pull',         detail: '50 m',      emoji: '🪢', t: [150, 210, 270, 360] },
+  { name: 'Burpee Broad Jump', detail: '80 m',      emoji: '🤸', t: [210, 300, 390, 540] },
+  { name: 'Rowing',            detail: '1000 m',    emoji: '🚣', t: [220, 260, 300, 360] },
+  { name: 'Farmers Carry',     detail: '200 m',     emoji: '🧳', t: [105, 135, 165, 210] },
+  { name: 'Sandbag Lunges',    detail: '100 m',     emoji: '🎒', t: [200, 270, 330, 420] },
+  { name: 'Wall Balls',        detail: '100 reps',  emoji: '🏐', t: [240, 330, 420, 540] },
+];
+
+const SIM_PRESETS = [
+  { name: 'Élite (~1 h 00)',          idx: 0, pace: 255, rox: 20 },
+  { name: 'Compétiteur (~1 h 15)',    idx: 1, pace: 300, rox: 30 },
+  { name: 'Intermédiaire (~1 h 30)',  idx: 2, pace: 345, rox: 40 },
+  { name: 'Découverte (~1 h 50)',     idx: 3, pace: 405, rox: 60 },
+];
+
+/** Accepte "5:30", "5 30", "330" (=330 s) ou "5.30" et renvoie des secondes. */
+function parseTime(str) {
+  if (typeof str === 'number') return Math.max(0, Math.round(str));
+  const s = String(str || '').trim().replace(/[.,\s]/g, ':');
+  if (!s) return 0;
+  const parts = s.split(':').filter((p) => p !== '').map((p) => parseInt(p, 10) || 0);
+  if (!parts.length) return 0;
+  if (parts.length === 1) return Math.max(0, parts[0]);
+  if (parts.length === 2) return Math.max(0, parts[0] * 60 + parts[1]);
+  return Math.max(0, parts[0] * 3600 + parts[1] * 60 + parts[2]);
+}
+function fmtMMSS(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+function fmtHMS(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+
+let SIM = null;
+function simDefaults(presetIdx) {
+  // Attention : l'index 0 (Élite) est falsy — on borne explicitement.
+  let i = parseInt(presetIdx, 10);
+  if (isNaN(i)) i = 1;
+  i = Math.max(0, Math.min(SIM_PRESETS.length - 1, i));
+  const p = SIM_PRESETS[i];
+  return {
+    preset: i,
+    runs: new Array(8).fill(p.pace),
+    stations: HYROX_STATIONS.map((s) => s.t[p.idx]),
+    rox: p.rox,
+  };
+}
+function loadSim() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SIM_KEY));
+    if (s && Array.isArray(s.runs) && s.runs.length === 8 && Array.isArray(s.stations) && s.stations.length === 8) return s;
+  } catch (e) { /* ignore */ }
+  return simDefaults(1);
+}
+function saveSim() { try { localStorage.setItem(SIM_KEY, JSON.stringify(SIM)); } catch (e) {} }
+
+function simVerdict(total) {
+  if (total <= 0) return { label: '—', cls: '' };
+  if (total < 3900) return { label: '🔥 Niveau élite', cls: 'v-elite' };
+  if (total < 4800) return { label: '💪 Niveau compétiteur', cls: 'v-comp' };
+  if (total < 5700) return { label: '⚡ Niveau intermédiaire', cls: 'v-inter' };
+  return { label: '🚀 Niveau découverte', cls: 'v-dec' };
+}
+
+function renderSim() {
+  const totalRun = SIM.runs.reduce((a, b) => a + b, 0);
+  const totalSt = SIM.stations.reduce((a, b) => a + b, 0);
+  const totalRox = SIM.rox * 8;
+  const total = totalRun + totalSt + totalRox;
+  const pct = (x) => (total ? (x / total * 100) : 0);
+
+  document.getElementById('simTotal').textContent = fmtHMS(total);
+  const v = simVerdict(total);
+  const verdict = document.getElementById('simVerdict');
+  verdict.textContent = v.label;
+  verdict.className = 'sim-verdict ' + v.cls;
+
+  document.getElementById('simBar').innerHTML = `
+    <div class="sb-seg sb-run" style="width:${pct(totalRun)}%"></div>
+    <div class="sb-seg sb-st" style="width:${pct(totalSt)}%"></div>
+    <div class="sb-seg sb-rox" style="width:${pct(totalRox)}%"></div>`;
+  document.getElementById('simLegend').innerHTML = `
+    <span><i class="lg-run"></i>Course ${fmtHMS(totalRun)}</span>
+    <span><i class="lg-st"></i>Stations ${fmtHMS(totalSt)}</span>
+    <span><i class="lg-rox"></i>Roxzone ${fmtHMS(totalRox)}</span>`;
+
+  // Les 8 blocs
+  const rows = document.getElementById('simRows');
+  rows.innerHTML = '';
+  let cum = 0;
+  HYROX_STATIONS.forEach((st, i) => {
+    cum += SIM.runs[i] + SIM.stations[i] + SIM.rox;
+    const block = document.createElement('div');
+    block.className = 'sim-block';
+    block.innerHTML = `
+      <div class="sb-head"><span class="sb-num">Bloc ${i + 1}</span><span class="sb-cum">Cumul ${fmtHMS(cum)}</span></div>
+      <div class="sb-line run">
+        <span class="sb-ico">🏃</span>
+        <span class="sb-name">Course<em>1 km</em></span>
+        <input type="text" inputmode="numeric" data-kind="run" data-i="${i}" value="${fmtMMSS(SIM.runs[i])}" aria-label="Course ${i + 1}" />
+      </div>
+      <div class="sb-line st">
+        <span class="sb-ico">${st.emoji}</span>
+        <span class="sb-name">${st.name}<em>${st.detail}</em></span>
+        <input type="text" inputmode="numeric" data-kind="st" data-i="${i}" value="${fmtMMSS(SIM.stations[i])}" aria-label="${st.name}" />
+      </div>
+      <div class="sb-roxline">🔁 Roxzone <strong>${fmtMMSS(SIM.rox)}</strong></div>`;
+    block.querySelectorAll('input').forEach((inp) => {
+      inp.addEventListener('focus', () => inp.select());
+      inp.addEventListener('change', () => {
+        const val = parseTime(inp.value);
+        if (inp.dataset.kind === 'run') SIM.runs[+inp.dataset.i] = val;
+        else SIM.stations[+inp.dataset.i] = val;
+        saveSim(); renderSim();
+      });
+    });
+    rows.appendChild(block);
+  });
+
+  // Analyse
+  let slow = 0, fast = 0;
+  SIM.stations.forEach((t, i) => {
+    if (t > SIM.stations[slow]) slow = i;
+    if (t < SIM.stations[fast]) fast = i;
+  });
+  const stats = [
+    ['🏃 Temps de course', `${fmtHMS(totalRun)} · ${Math.round(pct(totalRun))} %`],
+    ['💪 Temps de stations', `${fmtHMS(totalSt)} · ${Math.round(pct(totalSt))} %`],
+    ['🔁 Roxzone totale', `${fmtHMS(totalRox)} · ${Math.round(pct(totalRox))} %`],
+    ['⏱️ Allure moyenne', `${fmtMMSS(totalRun / 8)} / km`],
+    ['🐌 Station la plus lente', `${HYROX_STATIONS[slow].name} — ${fmtMMSS(SIM.stations[slow])}`],
+    ['⚡ Station la plus rapide', `${HYROX_STATIONS[fast].name} — ${fmtMMSS(SIM.stations[fast])}`],
+  ];
+  document.getElementById('simStats').innerHTML = stats.map(([k, val]) =>
+    `<div class="ss-row"><span class="ss-k">${k}</span><span class="ss-v">${val}</span></div>`).join('');
+
+  document.getElementById('simPace').value = fmtMMSS(Math.round(totalRun / 8));
+  document.getElementById('simRox').value = fmtMMSS(SIM.rox);
+}
+
+function initSim() {
+  SIM = loadSim();
+  const sel = document.getElementById('simPreset');
+  sel.innerHTML = SIM_PRESETS.map((p, i) => `<option value="${i}">${p.name}</option>`).join('');
+  sel.value = SIM.preset != null ? SIM.preset : 1;
+  sel.addEventListener('change', () => {
+    SIM = simDefaults(parseInt(sel.value, 10));
+    saveSim(); renderSim();
+    toast(`🏁 Profil « ${SIM_PRESETS[SIM.preset].name} » chargé`);
+  });
+  document.getElementById('simRox').addEventListener('change', (e) => {
+    SIM.rox = parseTime(e.target.value); saveSim(); renderSim();
+  });
+  document.getElementById('simApplyPace').addEventListener('click', () => {
+    const pace = parseTime(document.getElementById('simPace').value);
+    if (pace <= 0) { toast('Indique une allure valide (ex. 5:00)'); return; }
+    SIM.runs = new Array(8).fill(pace);
+    saveSim(); renderSim();
+    toast(`🏃 Allure ${fmtMMSS(pace)}/km appliquée aux 8 km`);
+  });
+  document.getElementById('simReset').addEventListener('click', () => {
+    if (!confirm('Réinitialiser le simulateur avec le profil sélectionné ?')) return;
+    SIM = simDefaults(parseInt(sel.value, 10));
+    saveSim(); renderSim();
+    toast('↺ Simulateur réinitialisé');
+  });
+  renderSim();
+}
+initSim();
 
 /* -------------------------------------------------------------------------
    15. Démarrage
